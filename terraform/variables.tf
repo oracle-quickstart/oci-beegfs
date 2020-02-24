@@ -35,7 +35,7 @@ variable "management_server" {
 variable "metadata_server" {
   type = "map"
   default = {
-    shape      = "VM.Standard2.2"
+    shape      = "VM.DenseIO2.16"
     node_count = 1
     # if disk_count > 1, then internally it creates a RAID0 of multiple disks.
     disk_count = 3
@@ -51,7 +51,7 @@ variable "metadata_server" {
 variable "storage_server" {
   type = "map"
   default = {
-    shape      = "VM.Standard2.2"
+    shape      = "VM.DenseIO2.24"
     node_count = 1
     # Disk are attached as JBOD,  no RAID, since Oracle Block Storage has replication in-built
     disk_count = 3

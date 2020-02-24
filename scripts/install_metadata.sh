@@ -11,6 +11,38 @@ wget -O /etc/yum.repos.d/beegfs_rhel7.repo https://www.beegfs.io/release/latest-
 yum install beegfs-meta -y
 
 
+chunk_size=${block_size}; chunk_size_tmp=`echo $chunk_size | gawk -F"K" ' { print $1 }'` ;
+echo $chunk_size_tmp;
+
+
+nvme_lst=$(ls /dev/ | grep nvme | grep n1 | sort)
+nvme_cnt=$(ls /dev/ | grep nvme | grep n1 | wc -l)
+
+disk_list=""
+for disk in $nvme_lst
+do
+  disk_list="$disk_list /dev/$disk"
+done
+echo "disk_list=$disk_list"
+raid_device_count=$nvme_cnt
+raid_device_name="md0"
+mdadm --create md0 --level=0 --chunk=$chunk_size --raid-devices=$nvme_cnt $disk_list
+
+
+# Extract value "n" from any hostname like storage-server-n. n>=1
+num=`hostname | gawk -F"." '{ print $1 }' | gawk -F"-"  'NF>1&&$0=$(NF)'`
+id=$num
+count=1
+mkfs.xfs -d su=${block_size},sw=$nvme_cnt -l version=2,su=${block_size} /dev/md0
+    mkdir -p /data/mdt${count}
+    mount -t xfs -o noatime,inode64,nobarrier /dev/md0 /data/mdt${count}
+    mkdir -p /data/mdt${count}/beegfs_meta
+    /opt/beegfs/sbin/beegfs-setup-meta -p /data/mdt${count}/beegfs_meta -s $id -m ${management_server_filesystem_vnic_hostname_prefix}1.${filesystem_subnet_domain_name}
+
+
+if [ $nvme_cnt -eq 0 ]; then
+
+
 # Wait for block-attach of the Block volumes to complete. Terraform then creates the below file on server nodes of cluster.
 while [ ! -f /tmp/block-attach.complete ]
 do
@@ -24,8 +56,6 @@ blk_lst=$(lsblk -d --noheadings | grep -v sda | awk '{ print $1 }' | sort)
 blk_cnt=$(lsblk -d --noheadings | grep -v sda | wc -l)
 
 
-chunk_size=${block_size}; chunk_size_tmp=`echo $chunk_size | gawk -F"K" ' { print $1 }'` ;
-echo $chunk_size_tmp;
 
 disk_list=""
 for disk in $blk_lst
@@ -41,12 +71,15 @@ mdadm --create md0 --level=0 --chunk=$chunk_size --raid-devices=$blk_cnt $disk_l
 # Extract value "n" from any hostname like storage-server-n. n>=1
 num=`hostname | gawk -F"." '{ print $1 }' | gawk -F"-"  'NF>1&&$0=$(NF)'`
 id=$num
-
+count=1
 mkfs.xfs -d su=${block_size},sw=$blk_cnt -l version=2,su=${block_size} /dev/md0
     mkdir -p /data/mdt${count}
     mount -t xfs -o noatime,inode64,nobarrier /dev/md0 /data/mdt${count}
     mkdir -p /data/mdt${count}/beegfs_meta
     /opt/beegfs/sbin/beegfs-setup-meta -p /data/mdt${count}/beegfs_meta -s $id -m ${management_server_filesystem_vnic_hostname_prefix}1.${filesystem_subnet_domain_name}
+
+# close - if [ $nvme_cnt -eq 0 ]; then
+fi
 
 
 ###count=1

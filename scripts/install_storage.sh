@@ -11,6 +11,29 @@ wget -O /etc/yum.repos.d/beegfs_rhel7.repo https://www.beegfs.io/release/latest-
 yum install beegfs-storage -y
 
 
+
+nvme_lst=$(ls /dev/ | grep nvme | grep n1 | sort)
+nvme_cnt=$(ls /dev/ | grep nvme | grep n1 | wc -l)
+
+# Extract value "n" from any hostname like storage-server-n
+num=`hostname | gawk -F"." '{ print $1 }' | gawk -F"-"  'NF>1&&$0=$(NF)'`
+id=$num
+
+count=1
+# Create XFS directly on the block. No need for pvcreate/LVM, etc.
+for disk in $nvme_lst
+do
+    mkfs.xfs /dev/$disk
+    mkdir -p /data/ost${count}
+    mount -t xfs -o noatime,inode64,nobarrier /dev/$disk /data/ost${count}
+    mkdir -p /data/ost${count}/beegfs_storage
+    /opt/beegfs/sbin/beegfs-setup-storage -p /data/ost${count}/beegfs_storage -s $id -i ${id}${count} -m ${management_server_filesystem_vnic_hostname_prefix}1.${filesystem_subnet_domain_name}
+    count=$((count+1))
+done
+
+
+if [ $nvme_cnt -eq 0 ]; then
+
 # Wait for block-attach of the Block volumes to complete. Terraform then creates the below file on server nodes of cluster.
 while [ ! -f /tmp/block-attach.complete ]
 do
@@ -38,6 +61,8 @@ do
     /opt/beegfs/sbin/beegfs-setup-storage -p /data/ost${count}/beegfs_storage -s $id -i ${id}${count} -m ${management_server_filesystem_vnic_hostname_prefix}1.${filesystem_subnet_domain_name}
     count=$((count+1))
 done
+
+fi
 
 
 # Configure second vNIC
