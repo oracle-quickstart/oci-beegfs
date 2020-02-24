@@ -2,7 +2,6 @@
 Terraform modules that deploy [BeeGFS](https://www.beegfs.io/content/) on [Oracle Cloud Infrastructure (OCI)](https://cloud.oracle.com/en_US/cloud-infrastructure).
 
 ## High Level Architecture 
-TODO
 ![](./images/Beegfs_OCI_High_Level_Arch.png)
 
 ## Prerequisites
