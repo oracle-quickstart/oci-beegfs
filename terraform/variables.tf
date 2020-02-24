@@ -6,6 +6,128 @@
 variable "vpc_cidr" { default = "10.0.0.0/16" }
 
 
+# One bastion node
+variable "bastion" {
+  type = "map"
+  default = {
+    shape      = "VM.Standard2.2"
+    node_count = 1
+    hostname_prefix = "bastion-"
+  }
+}
+
+# BeeGFS Management (MGS) Server nodes variables
+variable "management_server" {
+  type = "map"
+  default = {
+    shape      = "VM.Standard2.2"
+    node_count = 1
+    disk_count = 1
+    # Disk Configuration. size is in GB.
+    disk_size = 50
+    # Block volume elastic performance tier.  The number of volume performance units (VPUs) that will be applied to this volume per GB, representing the Block Volume service's elastic performance options. See https://docs.cloud.oracle.com/en-us/iaas/Content/Block/Concepts/blockvolumeelasticperformance.htm for more information.  Allowed values are 0, 10, and 20.  Recommended value is 10 for balanced performance and 20 to receive higher performance (IO throughput and IOPS) per GB.
+    vpus_per_gb = "10"
+    hostname_prefix = "mgs-server-"
+    }
+}
+
+# BeeGFS Metadata (MDS) Server nodes variables
+variable "metadata_server" {
+  type = "map"
+  default = {
+    shape      = "VM.Standard2.2"
+    node_count = 1
+    # if disk_count > 1, then internally it creates a RAID0 of multiple disks.
+    disk_count = 3
+    # Disk Configuration. size is in GB.
+    disk_size = 50
+    # Block volume elastic performance tier.  The number of volume performance units (VPUs) that will be applied to this volume per GB, representing the Block Volume service's elastic performance options. See https://docs.cloud.oracle.com/en-us/iaas/Content/Block/Concepts/blockvolumeelasticperformance.htm for more information.  Allowed values are 0, 10, and 20.  Recommended value is 10 for balanced performance and 20 to receive higher performance (IO throughput and IOPS) per GB.
+    vpus_per_gb = "10"
+    hostname_prefix = "metadata-server-"
+    }
+}
+
+# BeeGFS Object (OSS) Server nodes variables
+variable "storage_server" {
+  type = "map"
+  default = {
+    shape      = "VM.Standard2.2"
+    node_count = 1
+    # Disk are attached as JBOD,  no RAID, since Oracle Block Storage has replication in-built
+    disk_count = 3
+    # Disk Configuration. size is in GB.
+    disk_size = 50
+    # Block volume elastic performance tier.  The number of volume performance units (VPUs) that will be applied to this volume per GB, representing the Block Volume service's elastic performance options. See https://docs.cloud.oracle.com/en-us/iaas/Content/Block/Concepts/blockvolumeelasticperformance.htm for more information.  Allowed values are 0, 10, and 20.  Recommended value is 10 for balanced performance and 20 to receive higher performance (IO throughput and IOPS) per GB.
+    vpus_per_gb = "10"
+    hostname_prefix = "storage-server-"
+    }
+}
+
+
+# Client nodes variables
+variable "client_node" {
+  type = "map"
+  default = {
+    shape      = "VM.Standard2.2"
+    node_count = 1
+    hostname_prefix = "client-"
+    }
+}
+
+/*
+  BeeGFS FS related variables
+*/
+variable "beegfs" {
+  type = "map"
+  default = {
+    # Has to be in KB only. Use capital K, not lowercase k.
+    block_size = "64K"
+    mount_point = "/mnt/beegfs"
+    # To be supported in future
+    high_availability = false
+  }
+}
+
+
+# This is currently used for the deployment.  
+variable "AD" {
+  default = "1"
+}
+
+################################################################
+## Variables which in most cases do not require change by user
+################################################################
+
+variable "scripts_directory" { default = "../scripts" }
+
+variable "tenancy_ocid" {}
+variable "user_ocid" {}
+variable "fingerprint" {}
+variable "private_key_path" {}
+variable "region" {}
+
+variable "compartment_ocid" {}
+variable "ssh_public_key" {}
+variable "ssh_private_key" {}
+variable "ssh_private_key_path" {}
+
+
+variable "ssh_user" { default = "opc" }
+
+
+locals {
+  management_server_dual_nics = (length(regexall("^BM", var.management_server["shape"])) > 0 ? true : false)
+  metadata_server_dual_nics = (length(regexall("^BM", var.metadata_server["shape"])) > 0 ? true : false)
+  storage_server_dual_nics = (length(regexall("^BM", var.storage_server["shape"])) > 0 ? true : false)
+  storage_subnet_domain_name=("${oci_core_subnet.private[0].dns_label}.${oci_core_virtual_network.beegfs.dns_label}.oraclevcn.com" )
+  filesystem_subnet_domain_name=("${oci_core_subnet.privateb[0].dns_label}.${oci_core_virtual_network.beegfs.dns_label}.oraclevcn.com" )
+  vcn_domain_name="${oci_core_virtual_network.beegfs.dns_label}.oraclevcn.com"
+  management_server_filesystem_vnic_hostname_prefix = "${var.management_server["hostname_prefix"]}fs-vnic-"
+  metadata_server_filesystem_vnic_hostname_prefix = "${var.metadata_server["hostname_prefix"]}fs-vnic-"
+  storage_server_filesystem_vnic_hostname_prefix = "${var.storage_server["hostname_prefix"]}fs-vnic-"
+}
+
+
 variable "images" {
   type = map(string)
   default = {
@@ -44,153 +166,4 @@ variable "imagesOL" {
     us-luke-1 = "ocid1.image.oc2.us-luke-1.aaaaaaaawo4qfu7ibanw2zwefm7q7hqpxsvzrmza4uwfqvtqg2quk6zghqia"
     us-phoenix-1 = "ocid1.image.oc1.phx.aaaaaaaamff6sipozlita6555ypo5uyqo2udhjqwtrml2trogi6vnpgvet5q"
   }
-}
-
-# One bastion node is enough
-variable "bastion" {
-  type = "map"
-  default = {
-    shape      = "VM.Standard2.2"
-    node_count = 1
-    hostname_prefix = "bastion-"
-  }
-}
-
-# Gluster Server nodes variables
-# Brick Disk Configuration. size is in GB.
-# if shape is DenseIO,  it will create a seperate FS just using local NVMe.
-variable "management_server" {
-  type = "map"
-  default = {
-    shape      = "VM.Standard2.2"
-    node_count = 1
-    disk_count = 0
-    disk_size = 50
-    # Make sure disk_count is a multiplier of num_of_disks_in_brick.  i.e: disk_count/num_of_disks_in_brick = an Integer, eg: disk_count=8,num_of_disks_in_brick=4 (8/4=2).
-    num_of_disks_in_brick = 1
-    # Block volume elastic performance tier.  The number of volume performance units (VPUs) that will be applied to this volume per GB, representing the Block Volume service's elastic performance options. See https://docs.cloud.oracle.com/en-us/iaas/Content/Block/Concepts/blockvolumeelasticperformance.htm for more information.  Allowed values are 0, 10, and 20.  Recommended value is 10 for balanced performance and 20 to receive higher performance (IO throughput and IOPS) per GB.
-    vpus_per_gb = "10"
-    hostname_prefix = "mgs-server-"
-    }
-}
-
-# Gluster Server nodes variables
-# Brick Disk Configuration. size is in GB.
-# if shape is DenseIO,  it will create a seperate FS just using local NVMe.
-variable "metadata_server" {
-  type = "map"
-  default = {
-    shape      = "VM.Standard2.2"
-    node_count = 3
-    disk_count = 0
-    disk_size = 50
-    # Make sure disk_count is a multiplier of num_of_disks_in_brick.  i.e: disk_count/num_of_disks_in_brick = an Integer, eg: disk_count=8,num_of_disks_in_brick=4 (8/4=2).
-    num_of_disks_in_brick = 1
-    # Block volume elastic performance tier.  The number of volume performance units (VPUs) that will be applied to this volume per GB, representing the Block Volume service's elastic performance options. See https://docs.cloud.oracle.com/en-us/iaas/Content/Block/Concepts/blockvolumeelasticperformance.htm for more information.  Allowed values are 0, 10, and 20.  Recommended value is 10 for balanced performance and 20 to receive higher performance (IO throughput and IOPS) per GB.
-    vpus_per_gb = "10"
-    hostname_prefix = "metadata-server-"
-    }
-}
-
-# Gluster Server nodes variables
-# Brick Disk Configuration. size is in GB.
-# if shape is DenseIO,  it will create a seperate FS just using local NVMe.
-variable "storage_server" {
-  type = "map"
-  default = {
-    shape      = "VM.Standard2.2"
-    node_count = 3
-    disk_count = 0
-    disk_size = 50
-    # Make sure disk_count is a multiplier of num_of_disks_in_brick.  i.e: disk_count/num_of_disks_in_brick = an Integer, eg: disk_count=8,num_of_disks_in_brick=4 (8/4=2).
-    num_of_disks_in_brick = 1
-    # Block volume elastic performance tier.  The number of volume performance units (VPUs) that will be applied to this volume per GB, representing the Block Volume service's elastic performance options. See https://docs.cloud.oracle.com/en-us/iaas/Content/Block/Concepts/blockvolumeelasticperformance.htm for more information.  Allowed values are 0, 10, and 20.  Recommended value is 10 for balanced performance and 20 to receive higher performance (IO throughput and IOPS) per GB.
-    vpus_per_gb = "10"
-    hostname_prefix = "storage-server-"
-    }
-}
-
-
-# Client nodes variables
-variable "client_node" {
-  type = "map"
-  default = {
-    shape      = "VM.Standard2.2"
-    node_count = 1
-    hostname_prefix = "client-"
-    }
-}
-
-/*
-  Gluster FS related variables
-*/
-variable "beegfs" {
-  type = "map"
-  default = {
-    # Valid values "5.9" , "3.12" on Oracle Linux Operating System
-    version      = "5.9"
-    # valid values are "Distributed", "Dispersed" , "DistributedDispersed"
-    # Future release may support:  "DistributedReplicated", "Replicated".  "Dispersed" volumes types are preferred over Replicated versions.
-    volume_types = "DistributedDispersed"
-    # replica field used only when VolumeTypes is "Replicated" or "DistributedReplicated". Otherwise assume no replication of data (replica=1 means no replication)
-    replica = 1
-    # Has to be in KiloBytes only. Use capital K, not lowercase k. 
-    block_size = "256K"
-    mount_point = "/beegfs"
-    # To be supported in future
-    high_availability = false
-  }
-}
-
-
-# This is currently used for the deployment.  
-variable "AD" {
-  default = "1"
-}
-
-##################################################
-## Variables which should not be changed by user
-##################################################
-
-variable "scripts_directory" { default = "../scripts" }
-
-variable "gluster_ol_repo_mapping" {
-  type = map(string)
-  default = {
-    "5.9" = "http://yum.oracle.com/repo/OracleLinux/OL7/gluster5/x86_64"
-    "3.12" = "http://yum.oracle.com/repo/OracleLinux/OL7/gluster312/x86_64"
-  }
-}
-
-
-
-
-###############
-
-variable "tenancy_ocid" {}
-variable "user_ocid" {}
-variable "fingerprint" {}
-variable "private_key_path" {}
-variable "region" {}
-
-variable "compartment_ocid" {}
-variable "ssh_public_key" {}
-variable "ssh_private_key" {}
-variable "ssh_private_key_path" {}
-
-
-variable "ssh_user" { default = "opc" }
-
-
-
-locals {
-  management_server_dual_nics = (length(regexall("^BM", var.management_server["shape"])) > 0 ? true : false)
-  metadata_server_dual_nics = (length(regexall("^BM", var.metadata_server["shape"])) > 0 ? true : false)
-  storage_server_dual_nics = (length(regexall("^BM", var.storage_server["shape"])) > 0 ? true : false)
-  storage_subnet_domain_name=("${oci_core_subnet.private[0].dns_label}.${oci_core_virtual_network.beegfs.dns_label}.oraclevcn.com" )
-  filesystem_subnet_domain_name=("${oci_core_subnet.privateb[0].dns_label}.${oci_core_virtual_network.beegfs.dns_label}.oraclevcn.com" )
-  vcn_domain_name="${oci_core_virtual_network.beegfs.dns_label}.oraclevcn.com"
-  management_server_filesystem_vnic_hostname_prefix = "${var.management_server["hostname_prefix"]}fs-vnic-"
-  metadata_server_filesystem_vnic_hostname_prefix = "${var.metadata_server["hostname_prefix"]}fs-vnic-"
-  storage_server_filesystem_vnic_hostname_prefix = "${var.storage_server["hostname_prefix"]}fs-vnic-"
 }

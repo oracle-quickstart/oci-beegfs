@@ -4,7 +4,6 @@ echo "storage_server_dual_nics=\"${storage_server_dual_nics}\"" >> /tmp/env_vari
 
 
 wget -O /etc/yum.repos.d/beegfs_rhel7.repo https://www.beegfs.io/release/latest-stable/dists/beegfs-rhel7.repo
-cp beegfs-rhel7.repo /etc/yum.repos.d/
 
 
 # metadata service; libbeegfs-ib is only required for RDMA
@@ -12,9 +11,56 @@ cp beegfs-rhel7.repo /etc/yum.repos.d/
 yum install beegfs-meta -y
 
 
-mkdir -p /data
-mkdir -p /data/beegfs/beegfs_meta
-/opt/beegfs/sbin/beegfs-setup-meta -p /data/beegfs/beegfs_meta -s 2 -m ${management_server_filesystem_vnic_hostname_prefix}1.${filesystem_subnet_domain_name}
+# Wait for block-attach of the Block volumes to complete. Terraform then creates the below file on server nodes of cluster.
+while [ ! -f /tmp/block-attach.complete ]
+do
+  sleep 60s
+  echo "Waiting for block-attach via Terraform to  complete ..."
+done
+
+
+# Gather list of block devices for setup
+blk_lst=$(lsblk -d --noheadings | grep -v sda | awk '{ print $1 }' | sort)
+blk_cnt=$(lsblk -d --noheadings | grep -v sda | wc -l)
+
+
+chunk_size=${block_size}; chunk_size_tmp=`echo $chunk_size | gawk -F"K" ' { print $1 }'` ;
+echo $chunk_size_tmp;
+
+disk_list=""
+for disk in $blk_lst
+do
+  disk_list="$disk_list /dev/$disk"
+done
+echo "disk_list=$disk_list"
+raid_device_count=$blk_cnt
+raid_device_name="md0"
+mdadm --create md0 --level=0 --chunk=$chunk_size --raid-devices=$blk_cnt $disk_list
+
+
+# Extract value "n" from any hostname like storage-server-n. n>=1
+num=`hostname | gawk -F"." '{ print $1 }' | gawk -F"-"  'NF>1&&$0=$(NF)'`
+id=$num
+
+mkfs.xfs -d su=${block_size},sw=$blk_cnt -l version=2,su=${block_size} /dev/md0
+    mkdir -p /data/mdt${count}
+    mount -t xfs -o noatime,inode64,nobarrier /dev/md0 /data/mdt${count}
+    mkdir -p /data/mdt${count}/beegfs_meta
+    /opt/beegfs/sbin/beegfs-setup-meta -p /data/mdt${count}/beegfs_meta -s $id -m ${management_server_filesystem_vnic_hostname_prefix}1.${filesystem_subnet_domain_name}
+
+
+###count=1
+###for disk in $blk_lst
+###do
+###    mkfs.xfs /dev/$disk
+###    mkdir -p /data/mdt${count}
+###    mount -t xfs -o noatime,inode64,nobarrier /dev/$disk /data/mdt${count}
+###    mkdir -p /data/mdt${count}/beegfs_meta
+###    /opt/beegfs/sbin/beegfs-setup-meta -p /data/mdt${count}/beegfs_meta -s $id -m ${management_server_filesystem_vnic_hostname_prefix}1.${filesystem_subnet_domain_name}
+###    count=$((count+1))
+###done
+
+
 
 
 # Configure second vNIC
@@ -52,4 +98,11 @@ done
 # Start services.  They create log files here:  /var/log/beegfs-...
 systemctl start beegfs-meta
 
+# put this in the background so the main script can terminate and continue with the deployment
+( while !( systemctl restart beegfs-meta )
+do
+   # This ensures, all dependent services are up, until then retry
+   echo waiting for beegfs-meta to come online
+   sleep 10
+done ) &
 

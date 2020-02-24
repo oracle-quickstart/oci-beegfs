@@ -1,0 +1,220 @@
+
+/*
+Copyright © 2020, Oracle and/or its affiliates. All rights reserved.
+The Universal Permissive License (UPL), Version 1.0
+*/
+
+resource "oci_core_volume" "storage_blockvolume" {
+  count = var.storage_server["node_count"] * var.storage_server["disk_count"]
+
+  #availability_domain = data.oci_identity_availability_domains.ADs.availability_domains[((count.index % var.storage_server["node_count"])%3)]["name"]
+  availability_domain = data.oci_identity_availability_domains.ADs.availability_domains[var.AD - 1]["name"]
+
+  compartment_id      = var.compartment_ocid
+  display_name        = "storage${count.index % var.storage_server["node_count"] + 1}-target${count.index % var.storage_server["disk_count"] + 1}"
+  size_in_gbs         = "${var.storage_server["disk_size"]}"
+  vpus_per_gb         = var.storage_server["vpus_per_gb"]
+}
+
+resource "oci_core_volume_attachment" "storage_blockvolume_attach" {
+  attachment_type = "iscsi"
+  count = (var.storage_server["node_count"] * var.storage_server["disk_count"])
+  instance_id = element(
+    oci_core_instance.storage_server.*.id,
+    count.index % var.storage_server["node_count"],
+  )
+  volume_id = element(oci_core_volume.storage_blockvolume.*.id, count.index)
+
+  provisioner "remote-exec" {
+    connection {
+      agent   = false
+      timeout = "30m"
+      host = element(
+        oci_core_instance.storage_server.*.private_ip,
+        count.index % var.storage_server["node_count"],
+      )
+      user                = var.ssh_user
+      private_key         = var.ssh_private_key
+      bastion_host        = oci_core_instance.bastion[0].public_ip
+      bastion_port        = "22"
+      bastion_user        = var.ssh_user
+      bastion_private_key = var.ssh_private_key
+    }
+
+    inline = [
+      "sudo -s bash -c 'set -x && iscsiadm -m node -o new -T ${self.iqn} -p ${self.ipv4}:${self.port}'",
+      "sudo -s bash -c 'set -x && iscsiadm -m node -o update -T ${self.iqn} -n node.startup -v automatic '",
+      "sudo -s bash -c 'set -x && iscsiadm -m node -T ${self.iqn} -p ${self.ipv4}:${self.port} -l '",
+    ]
+  }
+}
+
+
+/*
+  Notify storage (OSS) server nodes that all block-attach is complete, so  server nodes can continue with their rest of the instance setup logic in cloud-init.
+*/
+resource "null_resource" "notify_storage_server_nodes_block_attach_complete" {
+  depends_on = [ oci_core_volume_attachment.storage_blockvolume_attach ]
+  count = var.storage_server["node_count"]
+  provisioner "remote-exec" {
+    connection {
+        agent               = false
+        timeout             = "30m"
+        host                = "${element(oci_core_instance.storage_server.*.private_ip, count.index)}"
+        user                = "${var.ssh_user}"
+        private_key         = "${var.ssh_private_key}"
+        bastion_host        = "${oci_core_instance.bastion.*.public_ip[0]}"
+        bastion_port        = "22"
+        bastion_user        = "${var.ssh_user}"
+        bastion_private_key = "${var.ssh_private_key}"
+    }
+    inline = [
+      "set -x",
+      "sudo touch /tmp/block-attach.complete",
+    ]
+  }
+}
+
+
+
+resource "oci_core_volume" "metadata_blockvolume" {
+  count = var.metadata_server["node_count"] * var.metadata_server["disk_count"]
+
+  #availability_domain = data.oci_identity_availability_domains.ADs.availability_domains[((count.index % var.storage_server["node_count"])%3)]["name"]
+  availability_domain = data.oci_identity_availability_domains.ADs.availability_domains[var.AD - 1]["name"]
+
+  compartment_id      = var.compartment_ocid
+  display_name        = "metadata${count.index % var.metadata_server["node_count"] + 1}-target${count.index % var.metadata_server["disk_count"] + 1}"
+  size_in_gbs         = "${var.metadata_server["disk_size"]}"
+  vpus_per_gb         = var.metadata_server["vpus_per_gb"]
+}
+
+resource "oci_core_volume_attachment" "metadata_blockvolume_attach" {
+  attachment_type = "iscsi"
+  count = (var.metadata_server["node_count"] * var.metadata_server["disk_count"])
+  instance_id = element(
+    oci_core_instance.metadata_server.*.id,
+    count.index % var.metadata_server["node_count"],
+  )
+  volume_id = element(oci_core_volume.metadata_blockvolume.*.id, count.index)
+
+  provisioner "remote-exec" {
+    connection {
+      agent   = false
+      timeout = "30m"
+      host = element(
+        oci_core_instance.metadata_server.*.private_ip,
+        count.index % var.metadata_server["node_count"],
+      )
+      user                = var.ssh_user
+      private_key         = var.ssh_private_key
+      bastion_host        = oci_core_instance.bastion[0].public_ip
+      bastion_port        = "22"
+      bastion_user        = var.ssh_user
+      bastion_private_key = var.ssh_private_key
+    }
+
+    inline = [
+      "sudo -s bash -c 'set -x && iscsiadm -m node -o new -T ${self.iqn} -p ${self.ipv4}:${self.port}'",
+      "sudo -s bash -c 'set -x && iscsiadm -m node -o update -T ${self.iqn} -n node.startup -v automatic '",
+      "sudo -s bash -c 'set -x && iscsiadm -m node -T ${self.iqn} -p ${self.ipv4}:${self.port} -l '",
+    ]
+  }
+}
+
+/*
+  Notify metadata server nodes that all block-attach is complete, so server nodes can continue with their rest of the instance setup logic in cloud-init.
+*/
+resource "null_resource" "notify_metadata_server_nodes_block_attach_complete" {
+  depends_on = [ oci_core_volume_attachment.metadata_blockvolume_attach ]
+  count = var.metadata_server["node_count"]
+  provisioner "remote-exec" {
+    connection {
+        agent               = false
+        timeout             = "30m"
+        host                = "${element(oci_core_instance.metadata_server.*.private_ip, count.index)}"
+        user                = "${var.ssh_user}"
+        private_key         = "${var.ssh_private_key}"
+        bastion_host        = "${oci_core_instance.bastion.*.public_ip[0]}"
+        bastion_port        = "22"
+        bastion_user        = "${var.ssh_user}"
+        bastion_private_key = "${var.ssh_private_key}"
+    }
+    inline = [
+      "set -x",
+      "sudo touch /tmp/block-attach.complete",
+    ]
+  }
+}
+
+
+resource "oci_core_volume" "management_blockvolume" {
+  count = var.management_server["node_count"] * var.management_server["disk_count"]
+
+  #availability_domain = data.oci_identity_availability_domains.ADs.availability_domains[((count.index % var.management_server["node_count"])%3)]["name"]
+  availability_domain = data.oci_identity_availability_domains.ADs.availability_domains[var.AD - 1]["name"]
+
+  compartment_id      = var.compartment_ocid
+  display_name        = "management${count.index % var.management_server["node_count"] + 1}-target${count.index % var.management_server["disk_count"] + 1}"
+  size_in_gbs         = "${var.management_server["disk_size"]}"
+  vpus_per_gb         = var.management_server["vpus_per_gb"]
+}
+
+resource "oci_core_volume_attachment" "management_blockvolume_attach" {
+  attachment_type = "iscsi"
+  count = (var.management_server["node_count"] * var.management_server["disk_count"])
+  instance_id = element(
+    oci_core_instance.management_server.*.id,
+    count.index % var.management_server["node_count"],
+  )
+  volume_id = element(oci_core_volume.management_blockvolume.*.id, count.index)
+
+  provisioner "remote-exec" {
+    connection {
+      agent   = false
+      timeout = "30m"
+      host = element(
+        oci_core_instance.management_server.*.private_ip,
+        count.index % var.management_server["node_count"],
+      )
+      user                = var.ssh_user
+      private_key         = var.ssh_private_key
+      bastion_host        = oci_core_instance.bastion[0].public_ip
+      bastion_port        = "22"
+      bastion_user        = var.ssh_user
+      bastion_private_key = var.ssh_private_key
+    }
+
+    inline = [
+      "sudo -s bash -c 'set -x && iscsiadm -m node -o new -T ${self.iqn} -p ${self.ipv4}:${self.port}'",
+      "sudo -s bash -c 'set -x && iscsiadm -m node -o update -T ${self.iqn} -n node.startup -v automatic '",
+      "sudo -s bash -c 'set -x && iscsiadm -m node -T ${self.iqn} -p ${self.ipv4}:${self.port} -l '",
+    ]
+  }
+}
+
+
+/*
+  Notify management server nodes that all block-attach is complete, so  server nodes can continue with their rest of the instance setup logic in cloud-init.
+*/
+resource "null_resource" "notify_management_server_nodes_block_attach_complete" {
+  depends_on = [ oci_core_volume_attachment.management_blockvolume_attach ]
+  count = var.management_server["node_count"]
+  provisioner "remote-exec" {
+    connection {
+        agent               = false
+        timeout             = "30m"
+        host                = "${element(oci_core_instance.management_server.*.private_ip, count.index)}"
+        user                = "${var.ssh_user}"
+        private_key         = "${var.ssh_private_key}"
+        bastion_host        = "${oci_core_instance.bastion.*.public_ip[0]}"
+        bastion_port        = "22"
+        bastion_user        = "${var.ssh_user}"
+        bastion_private_key = "${var.ssh_private_key}"
+    }
+    inline = [
+      "set -x",
+      "sudo touch /tmp/block-attach.complete",
+    ]
+  }
+}

@@ -20,3 +20,10 @@ else
     service firewalld stop
     chkconfig firewalld off
 fi
+
+# Disable SELinux
+cp /etc/selinux/config /etc/selinux/config.backup
+sed -i 's/SELINUX=enforcing/SELINUX=disabled/g' /etc/selinux/config
+
+setenforce 0
+

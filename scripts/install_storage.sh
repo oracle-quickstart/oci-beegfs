@@ -4,7 +4,6 @@ echo "storage_server_dual_nics=\"${storage_server_dual_nics}\"" >> /tmp/env_vari
 
 
 wget -O /etc/yum.repos.d/beegfs_rhel7.repo https://www.beegfs.io/release/latest-stable/dists/beegfs-rhel7.repo
-cp beegfs-rhel7.repo /etc/yum.repos.d/
 
 
 # storage service; libbeegfs-ib is only required for RDMA
@@ -12,14 +11,33 @@ cp beegfs-rhel7.repo /etc/yum.repos.d/
 yum install beegfs-storage -y
 
 
+# Wait for block-attach of the Block volumes to complete. Terraform then creates the below file on server nodes of cluster.
+while [ ! -f /tmp/block-attach.complete ]
+do
+  sleep 60s
+  echo "Waiting for block-attach via Terraform to  complete ..."
+done
 
-mkdir -p /data
-mkdir -p /data/mnt/myraid1/beegfs_storage
-/opt/beegfs/sbin/beegfs-setup-storage -p /data/mnt/myraid1/beegfs_storage -s 3 -i 301 -m ${management_server_filesystem_vnic_hostname_prefix}1.${filesystem_subnet_domain_name}
 
-#To add a second storage target on this same machine:
-mkdir -p /data/mnt/myraid2/beegfs_storage
-/opt/beegfs/sbin/beegfs-setup-storage -p /data/mnt/myraid2/beegfs_storage -s 3 -i 302
+# Gather list of block devices for brick config
+blk_lst=$(lsblk -d --noheadings | grep -v sda | awk '{ print $1 }' | sort)
+blk_cnt=$(lsblk -d --noheadings | grep -v sda | wc -l)
+
+# Extract value "n" from any hostname like storage-server-n
+num=`hostname | gawk -F"." '{ print $1 }' | gawk -F"-"  'NF>1&&$0=$(NF)'`
+id=$num
+
+count=1
+# Create XFS directly on the block. No need for pvcreate/LVM, etc.
+for disk in $blk_lst
+do
+    mkfs.xfs /dev/$disk
+    mkdir -p /data/ost${count}
+    mount -t xfs -o noatime,inode64,nobarrier /dev/$disk /data/ost${count}
+    mkdir -p /data/ost${count}/beegfs_storage
+    /opt/beegfs/sbin/beegfs-setup-storage -p /data/ost${count}/beegfs_storage -s $id -i ${id}${count} -m ${management_server_filesystem_vnic_hostname_prefix}1.${filesystem_subnet_domain_name}
+    count=$((count+1))
+done
 
 
 # Configure second vNIC
@@ -56,6 +74,11 @@ done
 
 # Start services.  They create log files here:  /var/log/beegfs-...
 systemctl start beegfs-storage
-systemctl start beegfs-helperd
 
-
+# Retry until successful. It retries until all dependent server nodes and their services/deamons are up and ready to connect
+( while !( systemctl restart beegfs-storage )
+do
+   # This ensures, all dependent services are up, until then retry
+   echo waiting for beegfs-storage to come online
+   sleep 10
+done ) &
