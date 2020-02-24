@@ -3,7 +3,7 @@ Terraform modules that deploy [BeeGFS](https://www.beegfs.io/content/) on [Oracl
 
 ## High Level Architecture 
 TODO
-![](./images/Lustre_OCI_High_Level_Arch.jpeg)
+![](./images/Beegfs_OCI_High_Level_Arch.png)
 
 ## Prerequisites
 First off you'll need to do some pre deploy setup.  That's all detailed [here](https://github.com/oracle/oci-quickstart-prerequisites).
