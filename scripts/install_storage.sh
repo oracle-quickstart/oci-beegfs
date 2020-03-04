@@ -28,6 +28,7 @@ do
     mount -t xfs -o noatime,inode64,nobarrier /dev/$disk /data/ost${count}
     mkdir -p /data/ost${count}/beegfs_storage
     /opt/beegfs/sbin/beegfs-setup-storage -p /data/ost${count}/beegfs_storage -s $id -i ${id}${count} -m ${management_server_filesystem_vnic_hostname_prefix}1.${filesystem_subnet_domain_name}
+    echo "/dev/$disk  /data/ost${count}   xfs     noatime,inode64,nobarrier  1 2" >> /etc/fstab
     count=$((count+1))
 done
 
@@ -43,8 +44,8 @@ done
 
 
 # Gather list of block devices for brick config
-blk_lst=$(lsblk -d --noheadings | grep -v sda | awk '{ print $1 }' | sort)
-blk_cnt=$(lsblk -d --noheadings | grep -v sda | wc -l)
+blk_lst=$(lsblk -d --noheadings | grep -v sda | grep -v nvme | awk '{ print $1 }' | sort)
+blk_cnt=$(lsblk -d --noheadings | grep -v sda | grep -v nvme | wc -l)
 
 # Extract value "n" from any hostname like storage-server-n
 num=`hostname | gawk -F"." '{ print $1 }' | gawk -F"-"  'NF>1&&$0=$(NF)'`
@@ -59,6 +60,7 @@ do
     mount -t xfs -o noatime,inode64,nobarrier /dev/$disk /data/ost${count}
     mkdir -p /data/ost${count}/beegfs_storage
     /opt/beegfs/sbin/beegfs-setup-storage -p /data/ost${count}/beegfs_storage -s $id -i ${id}${count} -m ${management_server_filesystem_vnic_hostname_prefix}1.${filesystem_subnet_domain_name}
+    echo "/dev/$disk  /data/ost${count}   xfs     noatime,inode64,nobarrier  1 2" >> /etc/fstab
     count=$((count+1))
 done
 
@@ -99,6 +101,8 @@ done
 
 # Start services.  They create log files here:  /var/log/beegfs-...
 systemctl start beegfs-storage
+systemctl enable beegfs-storage
+
 
 # Retry until successful. It retries until all dependent server nodes and their services/deamons are up and ready to connect
 ( while !( systemctl restart beegfs-storage )

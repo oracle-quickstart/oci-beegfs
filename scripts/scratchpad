@@ -18,3 +18,47 @@ END
 
 
 
+bastion_shape
+bastion_node_count
+bastion_hostname_prefix
+management_server_shape
+management_server_node_count
+management_server_disk_count
+management_server_disk_size
+management_server_disk_vpus_per_gb
+management_server_hostname_prefix
+metadata_server_shape
+metadata_server_node_count
+metadata_server_disk_count
+metadata_server_disk_size
+metadata_server_disk_vpus_per_gb
+metadata_server_hostname_prefix
+
+storage_server_shape
+storage_server_node_count
+storage_server_disk_count
+storage_server_disk_size
+storage_server_disk_vpus_per_gb
+storage_server_hostname_prefix
+
+client_node_shape
+client_node_count
+client_node_hostname_prefix
+
+beegfs_block_size
+beegfs_mount_point
+beegfs_high_availability
+
+vpc_cidr
+ssh_public_key
+ad
+
+
+Hidden list:
+scripts_directory
+tenancy_ocid
+region
+compartment_ocid
+ssh_user
+
+

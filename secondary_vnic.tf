@@ -1,6 +1,6 @@
 
 resource "oci_core_vnic_attachment" "storage_server_secondary_vnic_attachment" {
-  count = var.storage_server["node_count"]
+  count = var.storage_server_node_count
 
   #Required
   create_vnic_details {
@@ -22,7 +22,7 @@ resource "oci_core_vnic_attachment" "storage_server_secondary_vnic_attachment" {
 }
 
 resource "oci_core_vnic_attachment" "metadata_server_secondary_vnic_attachment" {
-  count = var.metadata_server["node_count"]
+  count = var.metadata_server_node_count
 
   #Required
   create_vnic_details {
@@ -45,7 +45,7 @@ resource "oci_core_vnic_attachment" "metadata_server_secondary_vnic_attachment" 
 
 
 resource "oci_core_vnic_attachment" "management_server_secondary_vnic_attachment" {
-  count = var.management_server["node_count"]
+  count = var.management_server_node_count
 
   #Required
   create_vnic_details {

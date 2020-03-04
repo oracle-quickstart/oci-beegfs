@@ -12,34 +12,32 @@ yum install beegfs-mgmtd -y
 yum install beegfs-admon -y
 yum install java -y
 
-chunk_size=${block_size}; chunk_size_tmp=`echo $chunk_size | gawk -F"K" ' { print $1 }'` ;
+chunk_size=${block_size}; chunk_size_tmp=`echo $chunk_size | gawk -F"k" ' { print $1 }'` ;
 echo $chunk_size_tmp;
-
-
-nvme_lst=$(ls /dev/ | grep nvme | grep n1 | sort)
-nvme_cnt=$(ls /dev/ | grep nvme | grep n1 | wc -l)
-
-disk_list=""
-for disk in $nvme_lst
-do
-  disk_list="$disk_list /dev/$disk"
-done
-echo "disk_list=$disk_list"
-raid_device_count=$nvme_cnt
-raid_device_name="md0"
-mdadm --create md0 --level=0 --chunk=$chunk_size --raid-devices=$nvme_cnt $disk_list
-
 
 # Extract value "n" from any hostname like storage-server-n. n>=1
 num=`hostname | gawk -F"." '{ print $1 }' | gawk -F"-"  'NF>1&&$0=$(NF)'`
 id=$num
 count=1
 
-mkfs.xfs -d su=${block_size},sw=$nvme_cnt -l version=2,su=${block_size} /dev/md0
-mkdir -p /data/mgt${count}
-    mount -t xfs -o noatime,inode64,nobarrier /dev/md0 /data/mgt${count}
+nvme_lst=$(ls /dev/ | grep nvme | grep n1 | sort)
+nvme_cnt=$(ls /dev/ | grep nvme | grep n1 | wc -l)
+
+count=1
+disk_list=""
+for disk in $nvme_lst
+do
+  if [ $count -eq 1 ];then
+    mkfs.xfs /dev/$disk
+    mkdir -p /data/mgt${count}
+    mount -t xfs -o noatime,inode64,nobarrier /dev/$disk /data/mgt${count}
     mkdir -p /data/mgt${count}/beegfs_mgmtd
     /opt/beegfs/sbin/beegfs-setup-mgmtd -p /data/mgt${count}/beegfs_mgmtd
+    echo "/dev/$disk  /data/mgt${count}   xfs     noatime,inode64,nobarrier  1 2" >> /etc/fstab
+  fi
+    count=$((count+1))
+done
+
 
 
 if [ $nvme_cnt -eq 0 ]; then
@@ -54,17 +52,20 @@ done
 
 
 # Gather list of block devices for setup
-blk_lst=$(lsblk -d --noheadings | grep -v sda | awk '{ print $1 }' | sort)
-blk_cnt=$(lsblk -d --noheadings | grep -v sda | wc -l)
+blk_lst=$(lsblk -d --noheadings | grep -v sda | grep -v nvme | awk '{ print $1 }' | sort)
+blk_cnt=$(lsblk -d --noheadings | grep -v sda | grep -v nvme | wc -l)
 
 count=1
 for disk in $blk_lst
 do
+  if [ $count -eq 1 ];then
     mkfs.xfs /dev/$disk
     mkdir -p /data/mgt${count}
     mount -t xfs -o noatime,inode64,nobarrier /dev/$disk /data/mgt${count}
     mkdir -p /data/mgt${count}/beegfs_mgmtd
     /opt/beegfs/sbin/beegfs-setup-mgmtd -p /data/mgt${count}/beegfs_mgmtd
+    echo "/dev/$disk  /data/mgt${count}   xfs     noatime,inode64,nobarrier  1 2" >> /etc/fstab
+  fi
     count=$((count+1))
 done
 
@@ -105,9 +106,11 @@ done
 
 # Start services.  They create log files here:  /var/log/beegfs-...
 systemctl start beegfs-mgmtd
+systemctl enable beegfs-mgmtd
 
 cp /etc/beegfs/beegfs-admon.conf /etc/beegfs/beegfs-admon.conf.backup
 sed -i "s/sysMgmtdHost/sysMgmtdHost=${management_server_filesystem_vnic_hostname_prefix}1.${filesystem_subnet_domain_name}/g" /etc/beegfs/beegfs-admon.conf
 
 systemctl start beegfs-admon
+systemctl enable beegfs-admon
 

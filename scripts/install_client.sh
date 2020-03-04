@@ -54,6 +54,9 @@ yum install beegfs-client beegfs-helperd beegfs-utils -y
 systemctl start beegfs-helperd
 systemctl start beegfs-client
 
+systemctl enable beegfs-helperd
+systemctl enable beegfs-client
+
 # Retry until successful. It retries until all dependent server nodes and their services/deamons are up and ready for clients to connect and mount file system
 ( while !( systemctl restart beegfs-client )
 do
