@@ -28,7 +28,7 @@ do
     mount -t xfs -o noatime,inode64,nobarrier /dev/$disk /data/ost${count}
     mkdir -p /data/ost${count}/beegfs_storage
     /opt/beegfs/sbin/beegfs-setup-storage -p /data/ost${count}/beegfs_storage -s $id -i ${id}${count} -m ${management_server_filesystem_vnic_hostname_prefix}1.${filesystem_subnet_domain_name}
-    echo "/dev/$disk  /data/ost${count}   xfs     noatime,inode64,nobarrier  1 2" >> /etc/fstab
+    echo "/dev/$disk  /data/ost${count}   xfs     defaults,_netdev,noatime,inode64        0 0" >> /etc/fstab
     count=$((count+1))
 done
 
@@ -60,7 +60,7 @@ do
     mount -t xfs -o noatime,inode64,nobarrier /dev/$disk /data/ost${count}
     mkdir -p /data/ost${count}/beegfs_storage
     /opt/beegfs/sbin/beegfs-setup-storage -p /data/ost${count}/beegfs_storage -s $id -i ${id}${count} -m ${management_server_filesystem_vnic_hostname_prefix}1.${filesystem_subnet_domain_name}
-    echo "/dev/$disk  /data/ost${count}   xfs     noatime,inode64,nobarrier  1 2" >> /etc/fstab
+    echo "/dev/$disk  /data/ost${count}   xfs     defaults,_netdev,noatime,inode64        0 0" >> /etc/fstab
     count=$((count+1))
 done
 

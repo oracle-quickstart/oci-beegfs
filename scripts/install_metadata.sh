@@ -48,7 +48,7 @@ if [ $nvme_cnt -ge 1 ]; then
   mount -t xfs -o noatime,inode64,nobarrier $mount_device_name /data/mdt${count}
   mkdir -p /data/mdt${count}/beegfs_meta
   /opt/beegfs/sbin/beegfs-setup-meta -p /data/mdt${count}/beegfs_meta -s $id -m ${management_server_filesystem_vnic_hostname_prefix}1.${filesystem_subnet_domain_name}
-  echo "$mount_device_name  /data/mdt${count}   xfs     noatime,inode64,nobarrier  1 2" >> /etc/fstab
+  echo "$mount_device_name  /data/mdt${count}   xfs     defaults,_netdev,noatime,inode64        0 0" >> /etc/fstab
 
 fi
 
@@ -99,7 +99,7 @@ if [ $nvme_cnt -eq 0 ]; then
     mount -t xfs -o noatime,inode64,nobarrier $mount_device_name /data/mdt${count}
     mkdir -p /data/mdt${count}/beegfs_meta
     /opt/beegfs/sbin/beegfs-setup-meta -p /data/mdt${count}/beegfs_meta -s $id -m ${management_server_filesystem_vnic_hostname_prefix}1.${filesystem_subnet_domain_name}
-    echo "$mount_device_name  /data/mdt${count}   xfs     noatime,inode64,nobarrier  1 2" >> /etc/fstab
+    echo "$mount_device_name  /data/mdt${count}   xfs     defaults,_netdev,noatime,inode64        0 0" >> /etc/fstab
 
   fi
 

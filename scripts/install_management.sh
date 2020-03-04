@@ -33,7 +33,7 @@ do
     mount -t xfs -o noatime,inode64,nobarrier /dev/$disk /data/mgt${count}
     mkdir -p /data/mgt${count}/beegfs_mgmtd
     /opt/beegfs/sbin/beegfs-setup-mgmtd -p /data/mgt${count}/beegfs_mgmtd
-    echo "/dev/$disk  /data/mgt${count}   xfs     noatime,inode64,nobarrier  1 2" >> /etc/fstab
+    echo "/dev/$disk  /data/mgt${count}   xfs     defaults,_netdev,noatime,inode64        0 0" >> /etc/fstab
   fi
     count=$((count+1))
 done
@@ -64,7 +64,7 @@ do
     mount -t xfs -o noatime,inode64,nobarrier /dev/$disk /data/mgt${count}
     mkdir -p /data/mgt${count}/beegfs_mgmtd
     /opt/beegfs/sbin/beegfs-setup-mgmtd -p /data/mgt${count}/beegfs_mgmtd
-    echo "/dev/$disk  /data/mgt${count}   xfs     noatime,inode64,nobarrier  1 2" >> /etc/fstab
+    echo "/dev/$disk  /data/mgt${count}   xfs     defaults,_netdev,noatime,inode64        0 0" >> /etc/fstab
   fi
     count=$((count+1))
 done
