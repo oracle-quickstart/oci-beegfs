@@ -10,30 +10,39 @@ wget -O /etc/yum.repos.d/beegfs_rhel7.repo https://www.beegfs.io/release/latest-
 #yum install beegfs-storage libbeegfs-ib -y
 yum install beegfs-storage -y
 
+ost_count=1
+if [ "$storage_tier_1_disk_type" = "Local_NVMe_SSD" ]; then
+  nvme_lst=$(ls /dev/ | grep nvme | grep n1 | sort)
+  nvme_cnt=$(ls /dev/ | grep nvme | grep n1 | wc -l)
+
+  # Extract value "n" from any hostname like storage-server-n
+  num=`hostname | gawk -F"." '{ print $1 }' | gawk -F"-"  'NF>1&&$0=$(NF)'`
+  id=$num
+  # disk_type=0 for local nvme, 1 for high, 2 for balanced and 3 for low performance block volumes.
+  disk_type=0
+  count=1
+  # Create XFS directly on the block. No need for pvcreate/LVM, etc.
+  for disk in $nvme_lst
+  do
+      mkfs.xfs /dev/$disk
+      mkdir -p /data/ost${ost_count}
+      mount -t xfs -o noatime,inode64,nobarrier /dev/$disk /data/ost${ost_count}
+      mkdir -p /data/ost${ost_count}/beegfs_storage
+      /opt/beegfs/sbin/beegfs-setup-storage -p /data/ost${ost_count}/beegfs_storage -s $id -i ${id}${disk_type}${ost_count} -m ${management_server_filesystem_vnic_hostname_prefix}1.${filesystem_subnet_domain_name}
+      echo "/dev/$disk  /data/ost${ost_count}   xfs     defaults,_netdev,noatime,inode64        0 0" >> /etc/fstab
+      count=$((count+1))
+      ost_count=$((ost_count+1))
+  done
+fi
 
 
-nvme_lst=$(ls /dev/ | grep nvme | grep n1 | sort)
-nvme_cnt=$(ls /dev/ | grep nvme | grep n1 | wc -l)
+###if [ $nvme_cnt -eq 0 ]; then
+if [ "$storage_tier_1_disk_type" = "Local_NVMe_SSD" ]; then
+  all_block_count=$((storage_tier_2_disk_count + storage_tier_3_disk_count + storage_tier_4_disk_count))
+else
+  all_block_count=$((storage_tier_1_disk_count + storage_tier_2_disk_count + storage_tier_3_disk_count))
+fi
 
-# Extract value "n" from any hostname like storage-server-n
-num=`hostname | gawk -F"." '{ print $1 }' | gawk -F"-"  'NF>1&&$0=$(NF)'`
-id=$num
-
-count=1
-# Create XFS directly on the block. No need for pvcreate/LVM, etc.
-for disk in $nvme_lst
-do
-    mkfs.xfs /dev/$disk
-    mkdir -p /data/ost${count}
-    mount -t xfs -o noatime,inode64,nobarrier /dev/$disk /data/ost${count}
-    mkdir -p /data/ost${count}/beegfs_storage
-    /opt/beegfs/sbin/beegfs-setup-storage -p /data/ost${count}/beegfs_storage -s $id -i ${id}${count} -m ${management_server_filesystem_vnic_hostname_prefix}1.${filesystem_subnet_domain_name}
-    echo "/dev/$disk  /data/ost${count}   xfs     defaults,_netdev,noatime,inode64        0 0" >> /etc/fstab
-    count=$((count+1))
-done
-
-
-if [ $nvme_cnt -eq 0 ]; then
 
 # Wait for block-attach of the Block volumes to complete. Terraform then creates the below file on server nodes of cluster.
 while [ ! -f /tmp/block-attach.complete ]
@@ -47,24 +56,54 @@ done
 blk_lst=$(lsblk -d --noheadings | grep -v sda | grep -v nvme | awk '{ print $1 }' | sort)
 blk_cnt=$(lsblk -d --noheadings | grep -v sda | grep -v nvme | wc -l)
 
+if [ $blk_cnt -ne $all_block_count ]; then
+  echo "Total block volume attached not matching input, exiting."
+  exit 1;
+fi
+
 # Extract value "n" from any hostname like storage-server-n
 num=`hostname | gawk -F"." '{ print $1 }' | gawk -F"-"  'NF>1&&$0=$(NF)'`
 id=$num
-
+disk_type=99
 count=1
 # Create XFS directly on the block. No need for pvcreate/LVM, etc.
 for disk in $blk_lst
 do
+
+   if [ "$storage_tier_1_disk_type" = "Local_NVMe_SSD" ]; then
+     if [ $count -le $storage_tier_2_disk_count ]; then
+       disk_type=1
+     elif [ $count -le $((storage_tier_2_disk_count+storage_tier_3_disk_count)) ]; then
+       disk_type=2
+     elif [ $count -le $((storage_tier_2_disk_count+storage_tier_3_disk_count+storage_tier_4_disk_count)) ];   then
+       disk_type=3
+     else
+       echo "This should not happen, attached blocks are more than required by filesystem"
+       #exit 1;
+     fi
+   else
+     if [ $count -le $storage_tier_1_disk_count ]; then
+       disk_type=1
+     elif [ $count -le $((storage_tier_1_disk_count+storage_tier_2_disk_count)) ]; then
+       disk_type=2
+     elif [ $count -le $((storage_tier_1_disk_count+storage_tier_2_disk_count+storage_tier_3_disk_count)) ];   then
+       disk_type=3
+     else
+       echo "This should not happen, attached blocks are more than required by filesystem"
+       #exit 1;
+     fi
+   fi
     mkfs.xfs /dev/$disk
-    mkdir -p /data/ost${count}
-    mount -t xfs -o noatime,inode64,nobarrier /dev/$disk /data/ost${count}
-    mkdir -p /data/ost${count}/beegfs_storage
-    /opt/beegfs/sbin/beegfs-setup-storage -p /data/ost${count}/beegfs_storage -s $id -i ${id}${count} -m ${management_server_filesystem_vnic_hostname_prefix}1.${filesystem_subnet_domain_name}
-    echo "/dev/$disk  /data/ost${count}   xfs     defaults,_netdev,noatime,inode64        0 0" >> /etc/fstab
+    mkdir -p /data/ost${ost_count}
+    mount -t xfs -o noatime,inode64,nobarrier /dev/$disk /data/ost${ost_count}
+    mkdir -p /data/ost${ost_count}/beegfs_storage
+    /opt/beegfs/sbin/beegfs-setup-storage -p /data/ost${ost_count}/beegfs_storage -s $id -i ${id}${disk_type}${ost_count} -m ${management_server_filesystem_vnic_hostname_prefix}1.${filesystem_subnet_domain_name}
+    echo "/dev/$disk  /data/ost${ost_count}   xfs     defaults,_netdev,noatime,inode64        0 0" >> /etc/fstab
     count=$((count+1))
+    ost_count=$((ost_count+1))
 done
 
-fi
+###fi
 
 
 # Configure second vNIC
@@ -111,3 +150,4 @@ do
    echo waiting for beegfs-storage to come online
    sleep 10
 done ) &
+

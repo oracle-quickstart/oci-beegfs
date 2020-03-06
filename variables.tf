@@ -36,7 +36,7 @@ variable metadata_server_hostname_prefix { default = "metadata-server-" }
 
 # BeeGFS Stoarage/Object (OSS) Server nodes variables
 variable storage_server_shape { default = "VM.Standard2.2" }
-variable storage_server_node_count { default = 1 }
+variable storage_server_node_count { default = 2 }
 # if disk_count > 1, then internally it creates a RAID0 of multiple disks.
 variable storage_server_disk_count { default = 3 }
 variable storage_server_disk_size { default = 50 }
@@ -150,4 +150,122 @@ variable "imagesOL" {
 # Not used for normal terraform apply, added for ORM deployments.
 variable "ad_name" {
   default = ""
+}
+
+
+variable "storage_tiering_enabled" {
+  default = "false"
+  description = "Set to true, if you plan to use multiple storage types (2 or more) to store your hot/warm/cold data. If set to true, you need to set values for atleast 2 storage tiers below.  If set to false, set values for only Storage Tier-1."
+}
+
+# Local_NVMe_SSD
+variable "storage_tier_1_disk_type" {
+  default = "High"
+  description = "Use Local_NVMe_SSD value only if DenseIO shape was selected for Storage server. Otherwise select block volume storage types (high, balanced, low) based on your performance needs. Valid values are Local_NVMe_SSD, High, Balanced."
+}
+
+variable "storage_tier_2_disk_type" {
+  default = "Balanced"
+  description = "Select block volume storage types (high, balanced, low) based on your performance needs. Valid values are High, Balanced or Low."
+}
+
+variable "storage_tier_3_disk_type" {
+  default = "Low"
+  description = "Select None or block volume storage types (high, balanced, low) based on your performance needs. Valid values are None, Balanced or Low."
+}
+
+variable "storage_tier_4_disk_type" {
+  default = "Low"
+  description = "Select None or block volume storage types (high, balanced, low) based on your performance needs. Valid values are None or Low."
+}
+
+variable "storage_tier_1_disk_count" {
+  default = "3"
+  description = "Number of local NVMe SSD/block volume disk. Each attached as JBOD (no RAID)."
+}
+
+variable "storage_tier_2_disk_count" {
+  default = "2"
+  description = "Number of block volume/disk. Each attached as JBOD (no RAID)."
+}
+
+variable "storage_tier_3_disk_count" {
+  default = "1"
+  description = "Number of block volume/disk. Each attached as JBOD (no RAID)."
+}
+
+variable "storage_tier_4_disk_count" {
+  default = "0"
+  description = "Number of block volume/disk. Each attached as JBOD (no RAID)."
+}
+
+
+variable "storage_tier_1_disk_size" {
+  default = "50"
+  description = "If Storage Tier Disk Type is Local_NVMe_SSD, then this field will be ignored.  Otherwise set Size in GB for each block volume/disk, min 50."
+}
+
+variable "storage_tier_2_disk_size" {
+  default = "50"
+  description = "Size in GB for each block volume/disk, min 50."
+}
+
+variable "storage_tier_3_disk_size" {
+  default = "50"
+  description = "Size in GB for each block volume/disk, min 50."
+}
+
+variable "storage_tier_4_disk_size" {
+  default = "50"
+  description = "Size in GB for each block volume/disk, min 50."
+}
+
+
+
+variable "volume_attach_device_mapping" {
+  type = map(string)
+  default = {
+    "0" = "/dev/oracleoci/oraclevdb"
+    "1" = "/dev/oracleoci/oraclevdc"
+    "2" = "/dev/oracleoci/oraclevdd"
+    "3" = "/dev/oracleoci/oraclevde"
+    "4" = "/dev/oracleoci/oraclevdf"
+    "5" = "/dev/oracleoci/oraclevdg"
+    "6" = "/dev/oracleoci/oraclevdh"
+    "7" = "/dev/oracleoci/oraclevdi"
+    "8" = "/dev/oracleoci/oraclevdj"
+    "9" = "/dev/oracleoci/oraclevdk"
+    "10" = "/dev/oracleoci/oraclevdl"
+    "11" = "/dev/oracleoci/oraclevdm"
+    "12" = "/dev/oracleoci/oraclevdn"
+    "13" = "/dev/oracleoci/oraclevdo"
+    "14" = "/dev/oracleoci/oraclevdp"
+    "15" = "/dev/oracleoci/oraclevdq"
+    "16" = "/dev/oracleoci/oraclevdr"
+    "17" = "/dev/oracleoci/oraclevds"
+    "18" = "/dev/oracleoci/oraclevdt"
+    "19" = "/dev/oracleoci/oraclevdu"
+    "20" = "/dev/oracleoci/oraclevdv"
+    "21" = "/dev/oracleoci/oraclevdw"
+    "22" = "/dev/oracleoci/oraclevdx"
+    "23" = "/dev/oracleoci/oraclevdy"
+    "24" = "/dev/oracleoci/oraclevdz"
+    "25" = "/dev/oracleoci/oraclevdaa"
+    "26" = "/dev/oracleoci/oraclevdab"
+    "27" = "/dev/oracleoci/oraclevdac"
+    "28" = "/dev/oracleoci/oraclevdad"
+    "29" = "/dev/oracleoci/oraclevdae"
+    "30" = "/dev/oracleoci/oraclevdaf"
+    "31" = "/dev/oracleoci/oraclevdag"
+  }
+}
+
+variable "volume_type_vpus_per_gb_mapping" {
+  type = map(string)
+  default = {
+    "High" = "20"
+    "Balanced" = "10"
+    "Low" = "0"
+    "None" = "-1"
+  }
 }

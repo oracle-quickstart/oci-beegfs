@@ -4,6 +4,7 @@ Copyright © 2020, Oracle and/or its affiliates. All rights reserved.
 The Universal Permissive License (UPL), Version 1.0
 */
 
+/*
 resource "oci_core_volume" "storage_blockvolume" {
   count = var.storage_server_node_count * var.storage_server_disk_count
 
@@ -53,11 +54,12 @@ bastion_private_key = "${tls_private_key.public_private_key_pair.private_key_pem
     ]
   }
 }
-
+*/
 
 /*
   Notify storage (OSS) server nodes that all block-attach is complete, so  server nodes can continue with their rest of the instance setup logic in cloud-init.
 */
+/*
 resource "null_resource" "notify_storage_server_nodes_block_attach_complete" {
   depends_on = [ oci_core_volume_attachment.storage_blockvolume_attach ]
   count = var.storage_server_node_count
@@ -81,7 +83,7 @@ bastion_private_key = "${tls_private_key.public_private_key_pair.private_key_pem
     ]
   }
 }
-
+*/
 
 
 resource "oci_core_volume" "metadata_blockvolume" {
