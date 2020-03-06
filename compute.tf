@@ -7,7 +7,7 @@ resource "oci_core_instance" "management_server" {
   count               = var.management_server_node_count
   #availability_domain = data.oci_identity_availability_domains.ADs.availability_domains[(count.index%3)]["name"]
   #availability_domain = data.oci_identity_availability_domains.ADs.availability_domains[var.ad_number - 1]["name"]
-  availability_domain = "${local.ad}"
+  availability_domain = local.ad
 
   fault_domain        = "FAULT-DOMAIN-${(count.index%3)+1}"
   compartment_id      = "${var.compartment_ocid}"
@@ -18,7 +18,8 @@ resource "oci_core_instance" "management_server" {
 
   source_details {
     source_type = "image"
-    source_id = "${var.images[var.region]}"
+    source_id = (var.use_marketplace_image ? var.mp_listing_resource_id : var.images[var.region])
+# "${var.images[var.region]}"
   }
 
   launch_options {
@@ -60,7 +61,7 @@ resource "oci_core_instance" "metadata_server" {
   count               = var.metadata_server_node_count
   #availability_domain = data.oci_identity_availability_domains.ADs.availability_domains[(count.index%3)]["name"]
   #availability_domain = data.oci_identity_availability_domains.ADs.availability_domains[var.ad_number - 1]["name"]
-  availability_domain = "${local.ad}"
+  availability_domain = local.ad
 
   fault_domain        = "FAULT-DOMAIN-${(count.index%3)+1}"
   compartment_id      = "${var.compartment_ocid}"
@@ -116,7 +117,7 @@ resource "oci_core_instance" "storage_server" {
   count               = var.storage_server_node_count
   #availability_domain = data.oci_identity_availability_domains.ADs.availability_domains[(count.index%3)]["name"]
   #availability_domain = data.oci_identity_availability_domains.ADs.availability_domains[var.ad_number - 1]["name"]
-  availability_domain = "${local.ad}"
+  availability_domain = local.ad
 
   fault_domain        = "FAULT-DOMAIN-${(count.index%3)+1}"
   compartment_id      = "${var.compartment_ocid}"
@@ -146,8 +147,8 @@ resource "oci_core_instance" "storage_server" {
         "#!/usr/bin/env bash",
         "set -x",
         "server_node_count=\"${var.storage_server_node_count}\"",
-        "disk_size=\"${var.storage_server_disk_size}\"",
-        "disk_count=\"${var.storage_server_disk_count}\"",
+#        "disk_size=\"${var.storage_server_disk_size}\"",
+#        "disk_count=\"${var.storage_server_disk_count}\"",
         "management_server_filesystem_vnic_hostname_prefix=\"${local.management_server_filesystem_vnic_hostname_prefix}\"",
         "metadata_server_filesystem_vnic_hostname_prefix=\"${local.metadata_server_filesystem_vnic_hostname_prefix}\"",
         "storage_server_filesystem_vnic_hostname_prefix=\"${local.metadata_server_filesystem_vnic_hostname_prefix}\"",
@@ -155,19 +156,18 @@ resource "oci_core_instance" "storage_server" {
         "storage_subnet_domain_name=\"${local.storage_subnet_domain_name}\"",
         "filesystem_subnet_domain_name=\"${local.filesystem_subnet_domain_name}\"",
         "vcn_domain_name=\"${local.vcn_domain_name}\"",
-"storage_tiering_enabled=\"${var.storage_tiering_enabled}\"",
-"storage_tier_1_disk_type=\"${var.storage_tier_1_disk_type}\"",
-"storage_tier_1_disk_count=\"${var.storage_tier_1_disk_count}\"",
-"storage_tier_1_disk_size=\"${var.storage_tier_1_disk_size}\"",
-"storage_tier_2_disk_type=\"${var.storage_tier_2_disk_type}\"",
-"storage_tier_2_disk_count=\"${var.storage_tier_2_disk_count}\"",
-"storage_tier_2_disk_size=\"${var.storage_tier_2_disk_size}\"",
-"storage_tier_3_disk_type=\"${var.storage_tier_3_disk_type}\"",
-"storage_tier_3_disk_count=\"${var.storage_tier_3_disk_count}\"",
-"storage_tier_3_disk_size=\"${var.storage_tier_3_disk_size}\"",
-"storage_tier_4_disk_type=\"${var.storage_tier_4_disk_type}\"",
-"storage_tier_4_disk_count=\"${var.storage_tier_4_disk_count}\"",
-"storage_tier_4_disk_size=\"${var.storage_tier_4_disk_size}\"",
+        "storage_tier_1_disk_type=\"${var.storage_tier_1_disk_type}\"",
+        "storage_tier_1_disk_count=\"${var.storage_tier_1_disk_count}\"",
+        "storage_tier_1_disk_size=\"${var.storage_tier_1_disk_size}\"",
+        "storage_tier_2_disk_type=\"${var.storage_tier_2_disk_type}\"",
+        "storage_tier_2_disk_count=\"${var.storage_tier_2_disk_count}\"",
+        "storage_tier_2_disk_size=\"${var.storage_tier_2_disk_size}\"",
+        "storage_tier_3_disk_type=\"${var.storage_tier_3_disk_type}\"",
+        "storage_tier_3_disk_count=\"${var.storage_tier_3_disk_count}\"",
+        "storage_tier_3_disk_size=\"${var.storage_tier_3_disk_size}\"",
+        "storage_tier_4_disk_type=\"${var.storage_tier_4_disk_type}\"",
+        "storage_tier_4_disk_count=\"${var.storage_tier_4_disk_count}\"",
+        "storage_tier_4_disk_size=\"${var.storage_tier_4_disk_size}\"",
         file("${var.scripts_directory}/firewall.sh"),
         file("${var.scripts_directory}/install_storage.sh")
       )))}"
@@ -184,7 +184,7 @@ resource "oci_core_instance" "client_node" {
   count               = "${var.client_node_count}"
   #availability_domain = data.oci_identity_availability_domains.ADs.availability_domains[(count.index%3)]["name"]
   #availability_domain = data.oci_identity_availability_domains.ADs.availability_domains[var.ad_number - 1]["name"]
-  availability_domain = "${local.ad}"
+  availability_domain = local.ad
   fault_domain        = "FAULT-DOMAIN-${(count.index%3)+1}"
   compartment_id      = "${var.compartment_ocid}"
   display_name        = "${var.client_node_hostname_prefix}${format("%01d", count.index+1)}"
@@ -236,7 +236,7 @@ resource "oci_core_instance" "client_node" {
 resource "oci_core_instance" "bastion" {
   count = "${var.bastion_node_count}"
   #availability_domain = data.oci_identity_availability_domains.ADs.availability_domains[var.ad_number - 1]["name"]
-  availability_domain = "${local.ad}"
+  availability_domain = local.ad
   fault_domain        = "FAULT-DOMAIN-${(count.index%3)+1}"
   compartment_id      = "${var.compartment_ocid}"
   display_name        = "${var.bastion_hostname_prefix}${format("%01d", count.index+1)}"

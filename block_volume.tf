@@ -10,7 +10,7 @@ resource "oci_core_volume" "storage_blockvolume" {
 
   #availability_domain = data.oci_identity_availability_domains.ADs.availability_domains[((count.index % var.storage_server_node_count)%3)]["name"]
   #availability_domain = data.oci_identity_availability_domains.ADs.availability_domains[var.ad_number - 1]["name"]
-  availability_domain = "${local.ad}"
+  availability_domain = local.ad
 
   compartment_id      = var.compartment_ocid
   display_name        = "storage${count.index % var.storage_server_node_count + 1}-target${count.index % var.storage_server_disk_count + 1}"
@@ -91,7 +91,7 @@ resource "oci_core_volume" "metadata_blockvolume" {
 
   #availability_domain = data.oci_identity_availability_domains.ADs.availability_domains[((count.index % var.storage_server_node_count)%3)]["name"]
   #availability_domain = data.oci_identity_availability_domains.ADs.availability_domains[var.ad_number - 1]["name"]
-  availability_domain = "${local.ad}"
+  availability_domain = local.ad
 
   compartment_id      = var.compartment_ocid
   display_name        = "metadata${count.index % var.metadata_server_node_count + 1}-target${count.index % var.metadata_server_disk_count + 1}"
@@ -167,7 +167,7 @@ resource "oci_core_volume" "management_blockvolume" {
 
   #availability_domain = data.oci_identity_availability_domains.ADs.availability_domains[((count.index % var.management_server_node_count)%3)]["name"]
   #availability_domain = data.oci_identity_availability_domains.ADs.availability_domains[var.ad_number - 1]["name"]
-  availability_domain = "${local.ad}"
+  availability_domain = local.ad
 
   compartment_id      = var.compartment_ocid
   display_name        = "management${count.index % var.management_server_node_count + 1}-target${count.index % var.management_server_disk_count + 1}"

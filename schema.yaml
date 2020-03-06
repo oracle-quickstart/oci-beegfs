@@ -2,6 +2,7 @@ title: "BeeGFS Deployment"
 schemaVersion: 1.0.0
 version: "20200303"
 locale: "en"
+
 groupings:
   - title: "Hidden General Configuration"
     visible: false
@@ -11,51 +12,78 @@ groupings:
     - region
     - scripts_directory
     - ssh_user
+    - volume_attach_device_mapping
+    - volume_type_vpus_per_gb_mapping
 # QS specific platform vars
     - ad_number
     - images
-#    - mp_listing_id
-#    - mp_listing_resource_id
-#    - mp_listing_resource_version
-#    - use_marketplace_image
-    # QS specific platform vars
-#    - ad_number
-#    - platform-images
-
-  - title: "BeeGFS Configuration"
+    - mp_listing_id
+    - mp_listing_resource_id
+    - mp_listing_resource_version
+    - use_marketplace_image
+  - title: "General Deployment Configuration"
     visible: true
     variables:
     - vpc_cidr
     - ssh_public_key
     - ad_name
+  - title: "Bastion Instance Configuration"
+    visible: true
+    variables:
     - bastion_shape
     - bastion_node_count
     - bastion_hostname_prefix
+  - title: "BeeGFS Management Service Configuration"
+    visible: true
+    variables:
     - management_server_shape
     - management_server_node_count
+    - management_server_hostname_prefix
     - management_server_disk_count
     - management_server_disk_size
     - management_server_disk_vpus_per_gb
-    - management_server_hostname_prefix
+  - title: "BeeGFS Metadata Service Configuration"
+    visible: true
+    variables:
     - metadata_server_shape
     - metadata_server_node_count
+    - metadata_server_hostname_prefix
     - metadata_server_disk_count
     - metadata_server_disk_size
     - metadata_server_disk_vpus_per_gb
-    - metadata_server_hostname_prefix
+  - title: "BeeGFS Storage Service Configuration"
+    visible: true
+    variables:
     - storage_server_shape
     - storage_server_node_count
-    - storage_server_disk_count
-    - storage_server_disk_size
-    - storage_server_disk_vpus_per_gb
     - storage_server_hostname_prefix
+  - title: "BeeGFS Storage Tiering Configuration"
+    visible: true
+    variables:
+    - storage_tier_1_disk_type
+    - storage_tier_1_disk_count
+    - storage_tier_1_disk_size
+    - storage_tier_2_disk_type
+    - storage_tier_2_disk_count
+    - storage_tier_2_disk_size
+    - storage_tier_3_disk_type
+    - storage_tier_3_disk_count
+    - storage_tier_3_disk_size
+    - storage_tier_4_disk_type
+    - storage_tier_4_disk_count
+    - storage_tier_4_disk_size
+  - title: "BeeGFS Client Instance Configuration"
+    visible: true
+    variables:
     - client_node_shape
     - client_node_count
     - client_node_hostname_prefix
+  - title: "BeeGFS Filesystem Configuration"
+    visible: true
+    variables:
     - beegfs_block_size
     - beegfs_mount_point
     - beegfs_high_availability
-
 
 
 # Add variable here ,  if you want to do input validation or else it does not need to be included here.
@@ -66,21 +94,18 @@ variables:
     type: string
     default: "10.0.0.0/16"
     required: true
-
   ssh_public_key:
     title: "SSH Public Key"
     description: "Public key for all compute instances."
     type: string
     required: true
-
   ad_name:
     title: "Availability Domain"
-    description: "Availability Domain where worker instances are deployed."
+    description: "Availability Domain where filesystem is deployed."
     type: oci:identity:availabilitydomain:name
     dependsOn:
       compartmentId: ${compartment_ocid}
     required: true
-
   bastion_shape:
     title: "Bastion Compute Shape"
     description: "Shape for bastion instances."
@@ -89,21 +114,18 @@ variables:
     required: true
     dependsOn:
       compartmentId: ${compartment_ocid}
-#      imageId: ${mp_listing_resource_id}
-
+      imageId: ${mp_listing_resource_id}
   bastion_node_count:
     title: "Number of bastion"
     description: "Number of bastion instances."
     type: integer
     default: 1
     required: true
-
   bastion_hostname_prefix:
     type: string
     required: true
     default: "bastion-"
     description: "Bastion hostname prefix "
-
   management_server_shape:
     title: "Management Server Compute Shape"
     description: "Shape for management server instances."
@@ -112,42 +134,45 @@ variables:
     required: true
     dependsOn:
       compartmentId: ${compartment_ocid}
-#      imageId: ${mp_listing_resource_id}
-
+      imageId: ${mp_listing_resource_id}
   management_server_node_count:
     title: "Number of management server"
     description: "Number of management server instances."
     type: integer
     default: 1
+    minimum: 1
+    maximum: 1
     required: true
-
   management_server_hostname_prefix:
     type: string
     required: true
     default: "mgs-server-"
     description: "Management server hostname prefix "
-
   management_server_disk_count:
     title: "Number of block volumes"
     description: "Number of block volumes for each management server. Local NVME will be prefered (and block unused) if available."
     type: integer
     default: 1
+    minimum: 0
+    maximum: 31
     required: true
-
   management_server_disk_size:
     title: "Block volume size"
     description: "Size in GB for block volumes attached to management server, min 50."
     type: integer
     default: 50
+    minimum: 50
+    maximum: 32768
     required: true
-
   management_server_disk_vpus_per_gb:
     description: "Block volume performance"
-    type: integer
+    type: enum
+    enum:
+    - "20"
+    - "10"
+    - "0"
     required: true
     default: 10
-
-
   metadata_server_shape:
     title: "Metadata Server Compute Shape"
     description: "Shape for metadata server instances."
@@ -156,41 +181,44 @@ variables:
     required: true
     dependsOn:
       compartmentId: ${compartment_ocid}
-#      imageId: ${mp_listing_resource_id}
-
+      imageId: ${mp_listing_resource_id}
   metadata_server_node_count:
     title: "Number of metadata server"
     description: "Number of metadata server instances."
     type: integer
+    minimum: 1
     default: 1
     required: true
-
   metadata_server_hostname_prefix:
     type: string
     required: true
     default: "metadata-server-"
     description: "Metadata server hostname prefix "
-
   metadata_server_disk_count:
     title: "Number of block volumes"
     description: "Number of block volumes for each metadata server. if >1 disks will form a RAID0 array. Local NVME will be prefered (and block unused) if available."
     type: integer
     default: 2
+    minimum: 0
+    maximum: 31
     required: true
-
   metadata_server_disk_size:
     title: "Block volume size"
     description: "Size in GB for block volumes attached to metadata server, min 50."
     type: integer
     default: 50
+    minimum: 50
+    maximum: 32768
     required: true
-
   metadata_server_disk_vpus_per_gb:
     description: "Block volume performance"
-    type: integer
+    type: enum
+    enum:
+    - "20"
+    - "10"
+    - "0"
     required: true
     default: 10
-
   storage_server_shape:
     title: "Storage Server Compute Shape"
     description: "Shape for storage server instances."
@@ -199,41 +227,123 @@ variables:
     required: true
     dependsOn:
       compartmentId: ${compartment_ocid}
-#      imageId: ${mp_listing_resource_id}
-
+      imageId: ${mp_listing_resource_id}
   storage_server_node_count:
     title: "Number of storage server"
     description: "Number of storage server instances."
     type: integer
     default: 3
+    minimum: 1
     required: true
-
   storage_server_hostname_prefix:
     type: string
     required: true
     default: "storage-server-"
     description: "Storage server hostname prefix "
-
-  storage_server_disk_count:
-    title: "Number of block volumes"
-    description: "Number of block volumes for each storage server. Each attached as JBOD (no RAID). Local NVME will be prefered (and block unused) if available."
-    type: integer
-    default: 3
+  storage_tier_1_disk_type:
+    title: "Storage tier-1 disk type"
+    description: "Use Local_NVMe_SSD value only if DenseIO shape was selected for Storage server. Otherwise select block volume storage types (high, balanced, low) based on your performance needs. Valid values are Local_NVMe_SSD, High, Balanced, Low."
+    type: enum
+    enum:
+    - "Local_NVMe_SSD"
+    - "High"
+    - "Balanced"
+    - "Low"
     required: true
-
-  storage_server_disk_size:
+  storage_tier_1_disk_count:
+    title: "Number of block volumes"
+    description: "Number of local NVMe SSD/block volume disk. Each attached as JBOD (no RAID)."
+    type: integer
+    default: 1
+    minimum: 1
+    maximum: 31
+    required: true
+  storage_tier_1_disk_size:
     title: "Block volume size"
-    description: "Size in GB for block volumes attached to storage server, min 50."
+    description: "If Storage Tier-1 Disk Type is Local_NVMe_SSD, then this field will be ignored.  Otherwise set Size in GB for each block volume/disk, min 50."
     type: integer
     default: 50
+    minimum: 50
+    maximum: 32768
     required: true
-
-  storage_server_disk_vpus_per_gb:
-    description: "Block volume performance"
+  storage_tier_2_disk_type:
+    title: "Storage tier-2 disk type"
+    description: "Select block volume storage types (high, balanced, low) based on your performance needs. Valid values are None, High, Balanced or Low."
+    default: None
+    type: enum
+    enum:
+    - "None"
+    - "High"
+    - "Balanced"
+    - "Low"
+    required: false
+  storage_tier_2_disk_count:
+    title: "Number of block volumes"
+    description: "Number of block volume disk per instance. Each attached as JBOD (no RAID)."
     type: integer
-    required: true
-    default: 10
-
+    default: 0
+    minimum: 0
+    maximum: 31
+    required: false
+  storage_tier_2_disk_size:
+    title: "Block volume size"
+    description: "Size in GB for each block volume/disk, min 50."
+    type: integer
+    default: 50
+    minimum: 50
+    maximum: 32768
+    required: false
+  storage_tier_3_disk_type:
+    title: "Storage tier-3 disk type"
+    description: "Select None or block volume storage types (high, balanced, low) based on your performance needs. Valid values are None, Balanced or Low."
+    default: None
+    type: enum
+    enum:
+    - "None"
+    - "Balanced"
+    - "Low"
+    required: false
+  storage_tier_3_disk_count:
+    title: "Number of block volumes"
+    description: "Number of block volume disk per instance. Each attached as JBOD (no RAID)."
+    type: integer
+    default: 0
+    minimum: 0
+    maximum: 31
+    required: false
+  storage_tier_3_disk_size:
+    title: "Block volume size"
+    description: "Size in GB for each block volume/disk, min 50."
+    type: integer
+    default: 50
+    minimum: 50
+    maximum: 32768
+    required: false
+  storage_tier_4_disk_type:
+    title: "Storage tier-4 disk type"
+    description: "Select None or block volume storage types (high, balanced, low) based on your performance needs. Valid values are None or Low."
+    default: None
+    type: enum
+    enum:
+    - "None"
+    - "Low"
+    required: false
+  storage_tier_4_disk_count:
+    title: "Number of block volumes"
+    description: "Number of block volume disk per instance. Each attached as JBOD (no RAID)."
+    type: integer
+    default: 0
+    minimum: 0
+    maximum: 31
+    required: false
+  storage_tier_4_disk_size:
+    title: "Block volume size"
+    description: "Size in GB for each block volume/disk, min 50."
+    type: integer
+    default: 50
+    minimum: 50
+    maximum: 32768
+    required: false
   client_node_shape:
     title: "Client Compute Shape"
     description: "Shape for client instances."
@@ -243,69 +353,58 @@ variables:
     dependsOn:
       compartmentId: ${compartment_ocid}
 #      imageId: ${mp_listing_resource_id}
-
   client_node_count:
     title: "Number of clients"
     description: "Number of client instances."
     type: integer
     default: 1
     required: true
-
   client_node_hostname_prefix:
     type: string
     required: true
     default: "client-"
     description: "Client hostname prefix "
-
   beegfs_block_size:
     type: string
     required: true
     default: "64"
     description: "Filesystem block size used at time of creation. Size in kilobytes only. Numerical value only. Example 64 for 64 kilobytes"
-
   beegfs_mount_point:
     type: string
     required: true
     default: "/mnt/beegfs"
     description: "Mount point on client instances for BeeGFS filesystem. "
-
   beegfs_high_availability:
     type: string
     required: true
     default: "false"
     description: "For future use."
-
   ad_number:
     description: "Shadowed TF value to ignore"
     type: integer
     required: true
     default: -1
-
   scripts_directory:
     type: string
     required: true
     default: "script"
     description: "Folder which has all the scripts."
-
   ssh_user:
     type: string
     required: true
     default: "opc"
     description: "opc for OracleLinux & CentOS, ubuntu for Ubuntu OS."
-
-#  mp_listing_id:
-#    type: string
-#    required: true
-#    description: "Marketplace Listing ID"
-
-#  mp_listing_resource_id:
-#    type: oci:core:image:id
-#    required: true
-#    description: "Marketplace Image OCID"
-#    dependsOn:
-#      compartmentId: ${compartment_ocid}
-
-# mp_listing_resource_version:
-#    type: string
-#    required: true
-#    description: "Marketplace Listing package version"
+  mp_listing_id:
+    type: string
+    required: true
+    description: "Marketplace Listing ID"
+  mp_listing_resource_id:
+    type: oci:core:image:id
+    required: true
+    description: "Marketplace Image OCID"
+    dependsOn:
+      compartmentId: ${compartment_ocid}
+  mp_listing_resource_version:
+    type: string
+    required: true
+    description: "Marketplace Listing package version"
