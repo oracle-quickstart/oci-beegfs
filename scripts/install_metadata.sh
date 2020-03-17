@@ -1,111 +1,89 @@
 set -x
 
-echo "storage_server_dual_nics=\"${storage_server_dual_nics}\"" >> /tmp/env_variables.sh
+function confirm_service_starts {
+  # put this in the background so the main script can terminate and continue with the deployment
+  ( while !( systemctl restart $service_name )
+  do
+    # This ensures, all dependent services are up, until then retry
+    echo waiting for beegfs-meta to come online
+    sleep 10
+  done ) &
+}
 
+function configure_disks {
 
-wget -O /etc/yum.repos.d/beegfs_rhel7.repo https://www.beegfs.io/release/latest-stable/dists/beegfs-rhel7.repo
+# For meta-data, we need small block-size.  use 4K default.
+block_size=4
 
-
-# metadata service; libbeegfs-ib is only required for RDMA
-#yum install beegfs-meta libbeegfs-ib  -y
-yum install beegfs-meta -y
-
-
-chunk_size=${block_size}; chunk_size_tmp=`echo $chunk_size | gawk -F"k|K|KB|kb" ' { print $1 }'` ;
-echo $chunk_size_tmp;
-
-
-nvme_lst=$(ls /dev/ | grep nvme | grep n1 | sort)
-nvme_cnt=$(ls /dev/ | grep nvme | grep n1 | wc -l)
-
-disk_list=""
-for disk in $nvme_lst
+count=1
+port_index=8005
+conf_file="/etc/beegfs/beegfs-meta.conf"
+for disk in $disk_lst
 do
-  disk_list="$disk_list /dev/$disk"
-done
-echo "disk_list=$disk_list"
-
-if [ $nvme_cnt -ge 2 ]; then
-  raid_device_count=$nvme_cnt
-  raid_device_name="md0"
-  # mdadm requires the chunk size to use uppercase K, eg: 64K. But mkfs.xfs su option expects it to be lowercase k.  eg: su=64k
-  mdadm --create $raid_device_name --level=0 --chunk=${block_size}K --raid-devices=$nvme_cnt $disk_list
-  mount_device_name="/dev/md/${raid_device_name}"
-elif [ $nvme_cnt -eq 1 ]; then
-  mount_device_name="$disk_list"
-else
-  echo "No NVMe disks"
-fi
-
-if [ $nvme_cnt -ge 1 ]; then
-  # Extract value "n" from any hostname like storage-server-n. n>=1
-  num=`hostname | gawk -F"." '{ print $1 }' | gawk -F"-"  'NF>1&&$0=$(NF)'`
-  id=$num
-  count=1
-  # mdadm requires the chunk size to use uppercase K, eg: 64K. But mkfs.xfs su option expects it to be lowercase k.  eg: su=64k
-  mkfs.xfs -d su=${block_size}k,sw=$nvme_cnt -l version=2,su=${block_size}k $mount_device_name
-  mkdir -p /data/mdt${count}
-  mount -t xfs -o noatime,inode64,nobarrier $mount_device_name /data/mdt${count}
-  mkdir -p /data/mdt${count}/beegfs_meta
-  /opt/beegfs/sbin/beegfs-setup-meta -p /data/mdt${count}/beegfs_meta -s $id -m ${management_server_filesystem_vnic_hostname_prefix}1.${filesystem_subnet_domain_name}
-  echo "$mount_device_name  /data/mdt${count}   xfs     defaults,_netdev,noatime,inode64        0 0" >> /etc/fstab
-
-fi
-
-
-if [ $nvme_cnt -eq 0 ]; then
-
-
-  # Wait for block-attach of the Block volumes to complete. Terraform then creates the below file on server nodes of cluster.
-  while [ ! -f /tmp/block-attach.complete ]
-  do
-    sleep 60s
-    echo "Waiting for block-attach via Terraform to  complete ..."
-  done
-
-
-  # Gather list of block devices for setup
-  blk_lst=$(lsblk -d --noheadings | grep -v sda | grep -v nvme | awk '{ print $1 }' | sort)
-  blk_cnt=$(lsblk -d --noheadings | grep -v sda | grep -v nvme | wc -l)
-
-  disk_list=""
-  for disk in $blk_lst
-  do
-    disk_list="$disk_list /dev/$disk"
-  done
-  echo "disk_list=$disk_list"
-
-  if [ $blk_cnt -ge 2 ]; then
-    raid_device_count=$blk_cnt
-    raid_device_name="md0"
-    # mdadm requires the chunk size to use uppercase K, eg: 64K. But mkfs.xfs su option expects it to be lowercase k.  eg: su=64k
-    mdadm --create $raid_device_name --level=0 --chunk=${block_size}K --raid-devices=$blk_cnt $disk_list
-    mount_device_name="/dev/md/${raid_device_name}"
-  elif [ $blk_cnt -eq 1 ]; then
-    mount_device_name="$disk_list"
-  else
-    echo "No Block Volume disks"
-  fi
-
-
-  if [ $blk_cnt -ge 1 ]; then
-    # Extract value "n" from any hostname like storage-server-n. n>=1
-    num=`hostname | gawk -F"." '{ print $1 }' | gawk -F"-"  'NF>1&&$0=$(NF)'`
-    id=$num
-    count=1
-    # mdadm requires the chunk size to use uppercase K, eg: 64K. But mkfs.xfs su option expects it to be lowercase k.  eg: su=64k
-    mkfs.xfs -d su=${block_size}k,sw=$blk_cnt -l version=2,su=${block_size}k $mount_device_name
+    mount_device_name="/dev/$disk"
+    stride=$((block_size*1024/4096)) ;  echo $stride
+    stripe_width=$((stride*1)) ; echo $stripe_width
+    mkfs.ext4 -i 2048 -I 512 -J size=400 -Odir_index,filetype -E stride=${stride},stripe_width=${stripe_width} -F $mount_device_name
     mkdir -p /data/mdt${count}
-    mount -t xfs -o noatime,inode64,nobarrier $mount_device_name /data/mdt${count}
+    mount -onoatime,nodiratime,user_xattr  $mount_device_name /data/mdt${count}
     mkdir -p /data/mdt${count}/beegfs_meta
-    /opt/beegfs/sbin/beegfs-setup-meta -p /data/mdt${count}/beegfs_meta -s $id -m ${management_server_filesystem_vnic_hostname_prefix}1.${filesystem_subnet_domain_name}
-    echo "$mount_device_name  /data/mdt${count}   xfs     defaults,_netdev,noatime,inode64        0 0" >> /etc/fstab
 
+    echo "$mount_device_name  /data/mdt${count}   ext4     defaults,_netdev,noatime,nodiratime,user_xattr        0 0" >> /etc/fstab
+
+
+  if [ $disk_cnt -ge 2 ]; then
+    conf_dir="/etc/beegfs/meta${count}.d"
+    conf_file="${conf_dir}/beegfs-meta.conf"
+    mkdir $conf_dir
+    cp /etc/beegfs/beegfs-meta.conf "$conf_dir/"
+    /opt/beegfs/sbin/beegfs-setup-meta -c /etc/beegfs/meta${count}.d/beegfs-meta.conf -p /data/mdt${count}/beegfs_meta -s ${id}${count} -S meta${id}-meta${count} -m ${management_server_filesystem_vnic_hostname_prefix}1.${filesystem_subnet_domain_name}
+  elif [ $disk_cnt -eq 1 ]; then
+    conf_file="/etc/beegfs/beegfs-meta.conf"
+    /opt/beegfs/sbin/beegfs-setup-meta -p /data/mdt${count}/beegfs_meta -s $id -m ${management_server_filesystem_vnic_hostname_prefix}1.${filesystem_subnet_domain_name}
+  else
+    echo "No $disk_type disks"
   fi
 
-# close - if [ $nvme_cnt -eq 0 ]; then
-fi
+  # Changes for multi-node:  https://www.beegfs.io/wiki/MultiMode
+  sed -i "s/connMetaPortTCP.*= 8005/connMetaPortTCP              = ${port_index}/g"  ${conf_file}
+  sed -i "s/connMetaPortUDP.*= 8005/connMetaPortUDP              = ${port_index}/g"  ${conf_file}
+  sed -i "s|logStdFile.*= /var/log/beegfs-meta.log|logStdFile                   = /var/log/beegfs-meta${count}.log|g"  ${conf_file}
+  port_index=$((port_index+1000))
 
+  # BeeGFS tuning before start of service.
+  sed -i 's/tuneNumWorkers.*= 0/tuneNumWorkers               = 64/g'  ${conf_file}
+  # default of 32 is good.
+  sed -i 's/connMaxInternodeNum.*= 32/connMaxInternodeNum          = 32/g'  ${conf_file}
+  sed -i 's/storeAllowFirstRunInit.*= false/storeAllowFirstRunInit       = true/g'  ${conf_file}
+
+
+  if [ $disk_cnt -ge 2 ]; then
+    service_name="beegfs-meta@meta${count}"
+  elif [ $disk_cnt -eq 1 ]; then
+    service_name="beegfs-meta"
+  else
+    # This should not happen, since we are looping through nvme's
+    echo "No $disk_type disks"
+  fi
+
+  systemctl start $service_name
+  systemctl status $service_name
+  systemctl enable $service_name
+  confirm_service_starts
+
+
+  count=$((count+1))
+
+done
+
+
+}
+
+
+
+
+##############
+function configure_vnics {
 
 # Configure second vNIC
 scriptsource="https://raw.githubusercontent.com/oracle/terraform-examples/master/examples/oci/connect_vcns_using_multiple_vnics/scripts/secondary_vnic_all_configure.sh"
@@ -138,17 +116,78 @@ do
    sleep 10
 done
 
-
-# Start services.  They create log files here:  /var/log/beegfs-...
-systemctl start beegfs-meta
-systemctl enable beegfs-meta
+}
 
 
-# put this in the background so the main script can terminate and continue with the deployment
-( while !( systemctl restart beegfs-meta )
-do
-   # This ensures, all dependent services are up, until then retry
-   echo waiting for beegfs-meta to come online
-   sleep 10
-done ) &
+##############
+# Start of script execution
+#############
+
+# Disable locate/mlocate/updatedb
+# http://www.beegfs.com/wiki/ClientTuning#hn_59ca4f8bbb_3
+# Metadata nodes.  The MDT's are mounted at /data/mdtX.
+sed -i 's|/mnt|/mnt /data|g'  /etc/updatedb.conf
+
+
+wget -O /etc/yum.repos.d/beegfs_rhel7.repo https://www.beegfs.io/release/latest-stable/dists/beegfs-rhel7.repo
+
+
+# metadata service; libbeegfs-ib is only required for RDMA
+#yum install beegfs-meta libbeegfs-ib  -y
+yum install beegfs-meta -y
+
+
+
+configure_vnics
+
+
+# Extract value "n" from any hostname like storage-server-n. n>=1
+num=`hostname | gawk -F"." '{ print $1 }' | gawk -F"-"  'NF>1&&$0=$(NF)'`
+id=$num
+
+
+nvme_lst=$(ls /dev/ | grep nvme | grep n1 | sort)
+nvme_cnt=$(ls /dev/ | grep nvme | grep n1 | wc -l)
+
+disk_lst=$nvme_lst
+disk_cnt=$nvme_cnt
+disk_type="nvme"
+configure_disks
+
+
+
+if [ $nvme_cnt -eq 0 ]; then
+
+  # Wait for block-attach of the Block volumes to complete. Terraform then creates the below file on server nodes of cluster.
+  while [ ! -f /tmp/block-attach.complete ]
+  do
+    sleep 60s
+    echo "Waiting for block-attach via Terraform to  complete ..."
+  done
+
+    # Assuming no more than 4 disk will be used to create a single MDT disk.
+    devices=(sdb sdc sdd sde sdf sdg sdh sdi nvme0n1 nvme1n1 nvme2n1 nvme3n1 nvme4n1 nvme5n1 nvme6n1 nvme7n1)
+    for dev in "${devices[@]}"
+    do
+      echo deadline > /sys/block/${dev}/queue/scheduler
+      echo 128 > /sys/block/${dev}/queue/nr_requests
+      echo 128 > /sys/block/${dev}/queue/read_ahead_kb
+      echo 256 > /sys/block/${dev}/queue/max_sectors_kb
+    done
+
+  # Gather list of block devices for setup
+  blk_lst=$(lsblk -d --noheadings | grep -v sda | grep -v nvme | awk '{ print $1 }' | sort)
+  blk_cnt=$(lsblk -d --noheadings | grep -v sda | grep -v nvme | wc -l)
+
+  disk_lst=$blk_lst
+  disk_cnt=$blk_cnt
+  disk_type="block"
+  configure_disks
+
+# close - if [ $nvme_cnt -eq 0 ]; then
+fi
+
+
+
+
 

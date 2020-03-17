@@ -1,6 +1,6 @@
 set -x
 
-echo "storage_server_dual_nics=\"${storage_server_dual_nics}\"" >> /tmp/env_variables.sh
+#echo "storage_server_dual_nics=\"${storage_server_dual_nics}\"" >> /tmp/env_variables.sh
 
 
 # For OL UEK
@@ -50,9 +50,11 @@ yum install beegfs-client beegfs-helperd beegfs-utils -y
 # client
 /opt/beegfs/sbin/beegfs-setup-client -m ${management_server_filesystem_vnic_hostname_prefix}1.${filesystem_subnet_domain_name}
 
+sed -i 's/connMaxInternodeNum.*= 12/connMaxInternodeNum          = 24/g'  /etc/beegfs/beegfs-client.conf
+
 # Start services.  They create log files here:  /var/log/beegfs-...
-systemctl start beegfs-helperd
-systemctl start beegfs-client
+systemctl start beegfs-helperd ; systemctl status beegfs-helperd
+systemctl start beegfs-client ; systemctl status beegfs-client
 
 systemctl enable beegfs-helperd
 systemctl enable beegfs-client
@@ -65,3 +67,5 @@ do
    sleep 10
 done ) &
 
+# post deployment, optional scripts like ior_install.sh will only run if below file exist. 
+touch /tmp/mount.complete

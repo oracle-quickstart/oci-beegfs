@@ -1,6 +1,6 @@
 set -x
 
-echo "storage_server_dual_nics=\"${storage_server_dual_nics}\"" >> /tmp/env_variables.sh
+#echo "storage_server_dual_nics=\"${storage_server_dual_nics}\"" >> /tmp/env_variables.sh
 
 
 wget -O /etc/yum.repos.d/beegfs_rhel7.repo https://www.beegfs.io/release/latest-stable/dists/beegfs-rhel7.repo
@@ -137,9 +137,11 @@ do
    sleep 10
 done
 
+sed -i 's/connMaxInternodeNum.*= 12/connMaxInternodeNum          = 24/g'  /etc/beegfs/beegfs-storage.conf
+sed -i 's/storeAllowFirstRunInit.*= false/storeAllowFirstRunInit       = true/g'  /etc/beegfs/beegfs-storage.conf
 
 # Start services.  They create log files here:  /var/log/beegfs-...
-systemctl start beegfs-storage
+systemctl start beegfs-storage ; systemctl status beegfs-storage
 systemctl enable beegfs-storage
 
 

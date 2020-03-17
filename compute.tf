@@ -101,6 +101,7 @@ resource "oci_core_instance" "metadata_server" {
         "filesystem_subnet_domain_name=\"${local.filesystem_subnet_domain_name}\"",
         "vcn_domain_name=\"${local.vcn_domain_name}\"",
         file("${var.scripts_directory}/firewall.sh"),
+        file("${var.scripts_directory}/metadata_tuning.sh"),
         file("${var.scripts_directory}/install_metadata.sh")
       )))}"
     }

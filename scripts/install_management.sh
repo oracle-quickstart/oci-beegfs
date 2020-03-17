@@ -1,6 +1,6 @@
 set -x
 
-echo "storage_server_dual_nics=\"${storage_server_dual_nics}\"" >> /tmp/env_variables.sh
+#echo "storage_server_dual_nics=\"${storage_server_dual_nics}\"" >> /tmp/env_variables.sh
 
 
 wget -O /etc/yum.repos.d/beegfs_rhel7.repo https://www.beegfs.io/release/latest-stable/dists/beegfs-rhel7.repo
@@ -105,7 +105,7 @@ done
 
 
 # Start services.  They create log files here:  /var/log/beegfs-...
-systemctl start beegfs-mgmtd
+systemctl start beegfs-mgmtd ; systemctl status beegfs-mgmtd
 systemctl enable beegfs-mgmtd
 
 cp /etc/beegfs/beegfs-admon.conf /etc/beegfs/beegfs-admon.conf.backup
