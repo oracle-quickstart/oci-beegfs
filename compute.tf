@@ -170,7 +170,8 @@ resource "oci_core_instance" "storage_server" {
         "storage_tier_4_disk_count=\"${var.storage_tier_4_disk_count}\"",
         "storage_tier_4_disk_size=\"${var.storage_tier_4_disk_size}\"",
         file("${var.scripts_directory}/firewall.sh"),
-        file("${var.scripts_directory}/install_storage.sh")
+        file("${var.scripts_directory}/install_storage.sh"),
+        file("${var.scripts_directory}/storage_tuning.sh"),
       )))}"
     }
 

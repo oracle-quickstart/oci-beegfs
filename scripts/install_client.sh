@@ -65,7 +65,7 @@ do
    # This ensures, all dependent services are up, until then retry
    echo waiting for beegfs-client to come online
    sleep 10
-done ) &
+done ) 
 
 # post deployment, optional scripts like ior_install.sh will only run if below file exist. 
 touch /tmp/mount.complete

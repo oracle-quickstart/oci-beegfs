@@ -12,7 +12,7 @@ variable bastion_hostname_prefix { default = "bastion-" }
 
 
 # BeeGFS Management (MGS) Server nodes variables
-variable management_server_shape { default = "VM.Standard2.8" }
+variable management_server_shape { default = "VM.Standard2.4" }
 variable management_server_node_count { default = 1 }
 variable management_server_disk_count { default = 1 }
 variable management_server_disk_size { default = 50 }
@@ -26,7 +26,7 @@ variable management_server_hostname_prefix { default = "mgs-server-" }
 variable metadata_server_shape { default = "VM.Standard2.24" }
 variable metadata_server_node_count { default = 1 }
 # if disk_count > 1, then it create multiple MDS instance, each with 1 disk as MDT for optimal performance. If node has both local nvme ssd and block storage, block storage volumes will be ignored.
-variable metadata_server_disk_count { default = 5 }
+variable metadata_server_disk_count { default = 1 }
 variable metadata_server_disk_size { default = 800 }
 # Block volume elastic performance tier.  The number of volume performance units (VPUs) that will be applied to this volume per GB, representing the Block Volume service's elastic performance options. See https://docs.cloud.oracle.com/en-us/iaas/Content/Block/Concepts/blockvolumeelasticperformance.htm for more information.  Allowed values are 0, 10, and 20.  Recommended value is 10 for balanced performance and 20 to receive higher performance (IO throughput and IOPS) per GB.
 variable metadata_server_disk_vpus_per_gb { default = "20" }
@@ -35,15 +35,15 @@ variable metadata_server_hostname_prefix { default = "metadata-server-" }
 
 
 # BeeGFS Stoarage/Object (OSS) Server nodes variables
-variable storage_server_shape { default = "VM.Standard2.24" }
-variable storage_server_node_count { default = 1 }
+variable storage_server_shape { default = "BM.Standard2.52" }
+variable storage_server_node_count { default = 12 }
 # Block volume elastic performance tier.  The number of volume performance units (VPUs) that will be applied to this volume per GB, representing the Block Volume service's elastic performance options. See https://docs.cloud.oracle.com/en-us/iaas/Content/Block/Concepts/blockvolumeelasticperformance.htm for more information.  Allowed values are 0, 10, and 20.  Recommended value is 10 for balanced performance and 20 to receive higher performance (IO throughput and IOPS) per GB.
 ###variable storage_server_disk_vpus_per_gb { default = "20" }
 variable storage_server_hostname_prefix { default = "storage-server-" }
 
 # Client nodes variables
 variable client_node_shape { default = "VM.Standard2.24" }
-variable client_node_count { default = 10 }
+variable client_node_count { default = 20 }
 variable client_node_hostname_prefix { default = "client-" }
 
 
@@ -58,7 +58,7 @@ variable beegfs_high_availability { default = false }
 
 # This is currently used for the deployment.  
 variable "ad_number" {
-  default = "0"
+  default = "2"
 }
 
 ################################################################
@@ -172,7 +172,7 @@ variable "storage_tier_4_disk_type" {
 }
 
 variable "storage_tier_1_disk_count" {
-  default = "8"
+  default = "12"
   description = "Number of local NVMe SSD/block volume disk. Each attached as JBOD (no RAID)."
 }
 
