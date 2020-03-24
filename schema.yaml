@@ -81,7 +81,7 @@ groupings:
   - title: "BeeGFS Filesystem Configuration"
     visible: true
     variables:
-    - beegfs_block_size
+    - beegfs_stripe_size
     - beegfs_mount_point
     - beegfs_high_availability
 
@@ -364,11 +364,11 @@ variables:
     required: true
     default: "client-"
     description: "Client hostname prefix "
-  beegfs_block_size:
+  beegfs_stripe_size:
     type: string
     required: true
-    default: "64"
-    description: "Filesystem block size used at time of creation. Size in kilobytes only. Numerical value only. Example 64 for 64 kilobytes"
+    default: "1m"
+    description: "Default file stripe size (aka chunk_size) used by clients to striping file data and send to desired number of storage targets (OSTs). Example: 1m, 512k, 2m, etc"
   beegfs_mount_point:
     type: string
     required: true

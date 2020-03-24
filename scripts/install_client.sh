@@ -1,12 +1,11 @@
 set -x
 
-#echo "storage_server_dual_nics=\"${storage_server_dual_nics}\"" >> /tmp/env_variables.sh
-
 
 # For OL UEK
 sudo yum install "kernel-uek-devel-uname-r == $(uname -r)"
 
 # To install a kernel-uek-devel version which is for the installed kernel version.
+
 # For CentOS
 sudo yum install "kernel-devel-uname-r == $(uname -r)"
 if [ $? -eq 0 ]; then
@@ -47,9 +46,15 @@ wget -O /etc/yum.repos.d/beegfs_rhel7.repo https://www.beegfs.io/release/latest-
 # client and command-line utils
 yum install beegfs-client beegfs-helperd beegfs-utils -y
 
-# client
+# client setup
 /opt/beegfs/sbin/beegfs-setup-client -m ${management_server_filesystem_vnic_hostname_prefix}1.${filesystem_subnet_domain_name}
 
+# Update client mount config to use custom mount point. /mnt/beegfs
+sed -i "s|/mnt/beegfs|${mount_point}|g"  /etc/beegfs/beegfs-mounts.conf
+
+
+
+# client tuning
 sed -i 's/connMaxInternodeNum.*= 12/connMaxInternodeNum          = 24/g'  /etc/beegfs/beegfs-client.conf
 
 # Start services.  They create log files here:  /var/log/beegfs-...
@@ -66,6 +71,11 @@ do
    echo waiting for beegfs-client to come online
    sleep 10
 done ) 
+
+
+# Update stripe_size
+beegfs-ctl --setpattern --chunksize=${stripe_size} --numtargets=4 ${mount_point}
+
 
 # post deployment, optional scripts like ior_install.sh will only run if below file exist. 
 touch /tmp/mount.complete

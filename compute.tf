@@ -41,7 +41,6 @@ resource "oci_core_instance" "management_server" {
         "server_hostname_prefix=\"${var.management_server_hostname_prefix}\"",
         "disk_size=\"${var.management_server_disk_size}\"",
         "disk_count=\"${var.management_server_disk_count}\"",
-        "block_size=\"${var.beegfs_block_size}\"",
         "storage_subnet_domain_name=\"${local.storage_subnet_domain_name}\"",
         "filesystem_subnet_domain_name=\"${local.filesystem_subnet_domain_name}\"",
         "vcn_domain_name=\"${local.vcn_domain_name}\"",
@@ -96,13 +95,12 @@ resource "oci_core_instance" "metadata_server" {
         "disk_count=\"${var.metadata_server_disk_count}\"",
         "management_server_filesystem_vnic_hostname_prefix=\"${local.management_server_filesystem_vnic_hostname_prefix}\"",
         "metadata_server_filesystem_vnic_hostname_prefix=\"${local.metadata_server_filesystem_vnic_hostname_prefix}\"",
-        "block_size=\"${var.beegfs_block_size}\"",
         "storage_subnet_domain_name=\"${local.storage_subnet_domain_name}\"",
         "filesystem_subnet_domain_name=\"${local.filesystem_subnet_domain_name}\"",
         "vcn_domain_name=\"${local.vcn_domain_name}\"",
         file("${var.scripts_directory}/firewall.sh"),
-        file("${var.scripts_directory}/metadata_tuning.sh"),
-        file("${var.scripts_directory}/install_metadata.sh")
+        file("${var.scripts_directory}/install_metadata.sh"),
+        file("${var.scripts_directory}/metadata_tuning.sh")
       )))}"
     }
 
@@ -153,7 +151,6 @@ resource "oci_core_instance" "storage_server" {
         "management_server_filesystem_vnic_hostname_prefix=\"${local.management_server_filesystem_vnic_hostname_prefix}\"",
         "metadata_server_filesystem_vnic_hostname_prefix=\"${local.metadata_server_filesystem_vnic_hostname_prefix}\"",
         "storage_server_filesystem_vnic_hostname_prefix=\"${local.metadata_server_filesystem_vnic_hostname_prefix}\"",
-        "block_size=\"${var.beegfs_block_size}\"",
         "storage_subnet_domain_name=\"${local.storage_subnet_domain_name}\"",
         "filesystem_subnet_domain_name=\"${local.filesystem_subnet_domain_name}\"",
         "vcn_domain_name=\"${local.vcn_domain_name}\"",
@@ -216,6 +213,7 @@ resource "oci_core_instance" "client_node" {
     user_data = "${base64encode(join("\n", list(
         "#!/usr/bin/env bash",
         "set -x",
+        "stripe_size=\"${var.beegfs_stripe_size}\"",
         "mount_point=\"${var.beegfs_mount_point}\"",
         "management_server_filesystem_vnic_hostname_prefix=\"${local.management_server_filesystem_vnic_hostname_prefix}\"",
         "storage_subnet_domain_name=\"${local.storage_subnet_domain_name}\"",

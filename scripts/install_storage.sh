@@ -1,14 +1,12 @@
 set -x
 
-#echo "storage_server_dual_nics=\"${storage_server_dual_nics}\"" >> /tmp/env_variables.sh
-
 
 wget -O /etc/yum.repos.d/beegfs_rhel7.repo https://www.beegfs.io/release/latest-stable/dists/beegfs-rhel7.repo
 
 
-# storage service; libbeegfs-ib is only required for RDMA
-#yum install beegfs-storage libbeegfs-ib -y
+# storage service
 yum install beegfs-storage -y
+
 
 ost_count=1
 if [ "$storage_tier_1_disk_type" = "Local_NVMe_SSD" ]; then

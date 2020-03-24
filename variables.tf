@@ -36,21 +36,21 @@ variable metadata_server_hostname_prefix { default = "metadata-server-" }
 
 # BeeGFS Stoarage/Object (OSS) Server nodes variables
 variable storage_server_shape { default = "BM.Standard2.52" }
-variable storage_server_node_count { default = 12 }
+variable storage_server_node_count { default = 2 }
 # Block volume elastic performance tier.  The number of volume performance units (VPUs) that will be applied to this volume per GB, representing the Block Volume service's elastic performance options. See https://docs.cloud.oracle.com/en-us/iaas/Content/Block/Concepts/blockvolumeelasticperformance.htm for more information.  Allowed values are 0, 10, and 20.  Recommended value is 10 for balanced performance and 20 to receive higher performance (IO throughput and IOPS) per GB.
 ###variable storage_server_disk_vpus_per_gb { default = "20" }
 variable storage_server_hostname_prefix { default = "storage-server-" }
 
 # Client nodes variables
 variable client_node_shape { default = "VM.Standard2.24" }
-variable client_node_count { default = 20 }
+variable client_node_count { default = 1 }
 variable client_node_hostname_prefix { default = "client-" }
 
 
 
 # BeeGFS FS related variables
-# Has to be in kilobytes only. Only numerical value.
-variable beegfs_block_size { default = "64" }
+# Default file stripe size (aka chunk_size) used by clients to striping file data and send to desired number of storage targets (OSTs). Example: 1m, 512k, 2m, etc
+variable beegfs_stripe_size { default = "1m" }
 variable beegfs_mount_point { default = "/mnt/beegfs" }
 # To be supported in future
 variable beegfs_high_availability { default = false }
@@ -60,6 +60,70 @@ variable beegfs_high_availability { default = false }
 variable "ad_number" {
   default = "2"
 }
+
+
+# Local_NVMe_SSD
+variable "storage_tier_1_disk_type" {
+  default = "High"
+  description = "Use Local_NVMe_SSD value only if DenseIO shape was selected for Storage server. Otherwise select block volume storage types (high, balanced, low) based on your performance needs. Valid values are Local_NVMe_SSD, High, Balanced, Low."
+}
+
+variable "storage_tier_2_disk_type" {
+  default = "Balanced"
+  description = "Select block volume storage types (high, balanced, low) based on your performance needs. Valid values are None, High, Balanced or Low."
+}
+
+variable "storage_tier_3_disk_type" {
+  default = "Low"
+  description = "Select None or block volume storage types (high, balanced, low) based on your performance needs. Valid values are None, Balanced or Low."
+}
+
+variable "storage_tier_4_disk_type" {
+  default = "Low"
+  description = "Select None or block volume storage types (high, balanced, low) based on your performance needs. Valid values are None or Low."
+}
+
+variable "storage_tier_1_disk_count" {
+  default = "4"
+  description = "Number of local NVMe SSD/block volume disk. Each attached as JBOD (no RAID)."
+}
+
+variable "storage_tier_2_disk_count" {
+  default = "0"
+  description = "Number of block volume/disk. Each attached as JBOD (no RAID)."
+}
+
+variable "storage_tier_3_disk_count" {
+  default = "0"
+  description = "Number of block volume/disk. Each attached as JBOD (no RAID)."
+}
+
+variable "storage_tier_4_disk_count" {
+  default = "0"
+  description = "Number of block volume/disk. Each attached as JBOD (no RAID)."
+}
+
+
+variable "storage_tier_1_disk_size" {
+  default = "1000"
+  description = "If Storage Tier Disk Type is Local_NVMe_SSD, then this field will be ignored.  Otherwise set Size in GB for each block volume/disk, min 50."
+}
+
+variable "storage_tier_2_disk_size" {
+  default = "50"
+  description = "Size in GB for each block volume/disk, min 50."
+}
+
+variable "storage_tier_3_disk_size" {
+  default = "50"
+  description = "Size in GB for each block volume/disk, min 50."
+}
+
+variable "storage_tier_4_disk_size" {
+  default = "50"
+  description = "Size in GB for each block volume/disk, min 50."
+}
+
 
 ################################################################
 ## Variables which in most cases do not require change by user
@@ -150,69 +214,6 @@ variable "ad_name" {
 }
 
 
-# Local_NVMe_SSD
-variable "storage_tier_1_disk_type" {
-  default = "High"
-  description = "Use Local_NVMe_SSD value only if DenseIO shape was selected for Storage server. Otherwise select block volume storage types (high, balanced, low) based on your performance needs. Valid values are Local_NVMe_SSD, High, Balanced, Low."
-}
-
-variable "storage_tier_2_disk_type" {
-  default = "Balanced"
-  description = "Select block volume storage types (high, balanced, low) based on your performance needs. Valid values are None, High, Balanced or Low."
-}
-
-variable "storage_tier_3_disk_type" {
-  default = "Low"
-  description = "Select None or block volume storage types (high, balanced, low) based on your performance needs. Valid values are None, Balanced or Low."
-}
-
-variable "storage_tier_4_disk_type" {
-  default = "Low"
-  description = "Select None or block volume storage types (high, balanced, low) based on your performance needs. Valid values are None or Low."
-}
-
-variable "storage_tier_1_disk_count" {
-  default = "12"
-  description = "Number of local NVMe SSD/block volume disk. Each attached as JBOD (no RAID)."
-}
-
-variable "storage_tier_2_disk_count" {
-  default = "0"
-  description = "Number of block volume/disk. Each attached as JBOD (no RAID)."
-}
-
-variable "storage_tier_3_disk_count" {
-  default = "0"
-  description = "Number of block volume/disk. Each attached as JBOD (no RAID)."
-}
-
-variable "storage_tier_4_disk_count" {
-  default = "0"
-  description = "Number of block volume/disk. Each attached as JBOD (no RAID)."
-}
-
-
-variable "storage_tier_1_disk_size" {
-  default = "1000"
-  description = "If Storage Tier Disk Type is Local_NVMe_SSD, then this field will be ignored.  Otherwise set Size in GB for each block volume/disk, min 50."
-}
-
-variable "storage_tier_2_disk_size" {
-  default = "50"
-  description = "Size in GB for each block volume/disk, min 50."
-}
-
-variable "storage_tier_3_disk_size" {
-  default = "50"
-  description = "Size in GB for each block volume/disk, min 50."
-}
-
-variable "storage_tier_4_disk_size" {
-  default = "50"
-  description = "Size in GB for each block volume/disk, min 50."
-}
-
-
 
 variable "volume_attach_device_mapping" {
   type = map(string)
@@ -265,16 +266,17 @@ variable "volume_type_vpus_per_gb_mapping" {
 
 #-------------------------------------------------------------------------------------------------------------
 # Marketplace variables
+# hpc-filesystem-BeeGFS-OL77_3.10.0-1062.9.1.el7.x86_64
 # ------------------------------------------------------------------------------------------------------------
 
 variable "mp_listing_id" {
-  default = "ocid1.appcataloglisting.oc1..aaaaaaaavxdzoflapwjvlapap6w7at2gnd66zah6ce2cxdhmftft5hz7itxa"
+  default = "ocid1.appcataloglisting.oc1..aaaaaaaajmdokvtzailtlchqxk7nai45fxar6em7dfbdibxmspjsvs4uz3uq"
 }
 variable "mp_listing_resource_id" {
-  default = "ocid1.image.oc1..aaaaaaaajpe7s6yzdfrhxhn5cuxtssuvoj22bired5qhydm3hcolgyrciz7q"
+  default = "ocid1.image.oc1..aaaaaaaacnodhlnuidkvnlvu3dpu4n26knkqudjxzfpq3vexi7cobbclmbxa"
 }
 variable "mp_listing_resource_version" {
- default = "1.0-030520202328"
+ default = "1.0"
 }
 
 variable "use_marketplace_image" {
