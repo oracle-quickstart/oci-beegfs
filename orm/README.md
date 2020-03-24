@@ -1,5 +1,5 @@
-# Deploy BeeGFS using Resource Manager Service on Oracle Cloud Infrastructure
-You can also deploy [BeeGFS](https://www.beegfs.io/content/) on [Oracle Cloud Infrastructure (OCI)](https://cloud.oracle.com/en_US/cloud-infrastructure) using [Resource Manager Servic](https://docs.cloud.oracle.com/en-us/iaas/Content/ResourceManager/Concepts/resourcemanager.htm) in OCI console.  See below for steps.  
+# Deploy BeeGFS using Resource Manager Service
+You can also deploy [BeeGFS](https://www.beegfs.io/content/) on [Oracle Cloud Infrastructure (OCI)](https://cloud.oracle.com/en_US/cloud-infrastructure) using [Resource Manager Servic](https://docs.cloud.oracle.com/en-us/iaas/Content/ResourceManager/Concepts/resourcemanager.htm) in OCI console or via OCI CLI.  See below for steps.  
 
 
 ## Deployment Steps
@@ -8,6 +8,7 @@ You can also deploy [BeeGFS](https://www.beegfs.io/content/) on [Oracle Cloud In
   1. Check if the dist folder has a Terraform Configuration (.zip) file. If yes, you can download it locally and create a Resource Manager Stack via console/CLI using steps documented [here](https://docs.cloud.oracle.com/en-us/iaas/Content/ResourceManager/Concepts/samplecomputeinstance.htm#build).
  
   2. If the Terraform Configuration (.zip) file, does not exist,  you can generate the zip file using the steps below. 
+
 
 	git clone https://github.com/oracle-quickstart/oci-beegfs.git
         cd oci-beegfs/orm 
