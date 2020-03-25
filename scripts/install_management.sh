@@ -46,8 +46,8 @@ if [ $nvme_cnt -eq 0 ]; then
 
 
   # Gather list of block devices for setup
-  blk_lst=$(lsblk -d --noheadings | grep -v sda | grep -v nvme | awk '{ print $1 }' | sort)
-  blk_cnt=$(lsblk -d --noheadings | grep -v sda | grep -v nvme | wc -l)
+  blk_lst=$(lsblk -d --noheadings | egrep -v -w "sda1|sda2|sda3|sda" | grep -v nvme | awk '{ print $1 }' | sort)
+  blk_cnt=$(lsblk -d --noheadings | egrep -v -w "sda1|sda2|sda3|sda" | grep -v nvme | wc -l)
 
   count=1
   for disk in $blk_lst
