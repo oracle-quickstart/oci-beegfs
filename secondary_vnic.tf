@@ -5,7 +5,7 @@ resource "oci_core_vnic_attachment" "storage_server_secondary_vnic_attachment" {
   #Required
   create_vnic_details {
     #Required
-    subnet_id = oci_core_subnet.privateb[0].id
+    subnet_id = local.fs_subnet_id
 
     #Optional
     assign_public_ip = "false"
@@ -27,7 +27,7 @@ resource "oci_core_vnic_attachment" "metadata_server_secondary_vnic_attachment" 
   #Required
   create_vnic_details {
     #Required
-    subnet_id = oci_core_subnet.privateb[0].id
+    subnet_id = local.fs_subnet_id
 
     #Optional
     assign_public_ip = "false"
@@ -50,7 +50,7 @@ resource "oci_core_vnic_attachment" "management_server_secondary_vnic_attachment
   #Required
   create_vnic_details {
     #Required
-    subnet_id = oci_core_subnet.privateb[0].id
+    subnet_id = local.fs_subnet_id
 
     #Optional
     assign_public_ip = "false"

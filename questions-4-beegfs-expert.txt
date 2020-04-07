@@ -1,0 +1,177 @@
+
+On a converged cluster -  what should be the tuning values if I run client + Storage,  or client + MDS
+
+
+What should be the block-size to use ?
+Should the default for MDT be 4K ?
+Default is 64KB for OST disks - no,  4K.
+1. Large Seq IO workload
+2. Very Small files workload (4k-100K)
+3. Small file workload (256K-1MB)
+
+
+Storage node disk:  mount options to use:
+
+https://www.beegfs.io/wiki/StorageServerTuning
+ mount -onoatime,nodiratime,logbufs=8,logbsize=256k,largeio,inode64,swalloc,allocsize=131072k /dev/sdX <mountpoint>
+
+For Non-RAID disk?
+onoatime,nodiratime
+logbufs=8,logbsize=256k
+Software RAID only?
+largeio,inode64,swalloc,allocsize=131072k
+
+CURRENT SETTING:
+mount -t xfs -o noatime,inode64,nobarrier /dev/$disk /data/ost${ost_count}
+
+
+BeeGFS has Stripe size at the client level - which define the min transfer block-size.  Use customer for Stripe_size and set it at the client level.
+
+
+I am currently setting this value for OST to 256K based on :  https://www.beegfs.io/wiki/StorageServerTuning#hn_59ca4f8bbb_2
+[root@storage-server-1 ~]# cat /sys/block/sdc/queue/max_sectors_kb
+256
+
+Should i change this and if yes, what should be the value and should it change in-tandem with Stripe_size?
+
+
+[root@storage-server-1 ~]# cat  /sys/class/scsi_host/host3/sg_tablesize
+4096
+[root@storage-server-1 ~]#
+
+Furthermore, high values of sg_tablesize (/sys/class/scsi_host/.../sg_tablesize) are recommended to allow large IOs. Those values depend on controller firmware versions, kernel versions and driver settings.
+
+What is recommended ?
+
+
+When should someone use SW Linux RAID0 instead of JBOD's for OSTs?   Each JBOD's can deliver 480MB/s.  Attaching them to our bare-metal compute with 25 Gbps (3125 MB/s - i.e around 8 can fill the n/w pipe).
+
+
+Is ZFS recommended
+
+
+
+System BIOS & Power Saving
+https://www.beegfs.io/wiki/StorageServerTuning#hn_59ca4f8bbb_29
+
+
+[root@storage-server-1 ~]# cat /proc/cpuinfo | grep -i "CPU MHz"
+cpu MHz        : 1000.000
+cpu MHz        : 1000.000
+
+You can check if CPU frequency scaling is disabled by using the following command on an idle system. If it is disabled, you should see the full clock frequency in the "CPU MHz" line for all CPU cores and not a reduced value.
+
+model name    : Intel(R) Xeon(R) Platinum 8167M CPU @ 2.00GHz
+
+
+
+[root@storage-server-1 ~]# cat /sys/devices/system/cpu/cpu3/cpufreq/scaling_governor
+conservative
+[root@storage-server-1 ~]#
+
+If the Intel pstate driver is disabled or not applicable to a system, frequency scaling can be changed at runtime, e.g. via:
+$ echo performance | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor >/dev/null
+
+[root@storage-server-1 ~]# tuned-adm active
+Current active profile: balanced
+[root@storage-server-1 ~]#
+
+
+
+
+Concurrency Tuning
+
+Worker Threads
+
+Storage servers, metadata servers and clients allow you to control the number of worker threads by setting the value of tuneNumWorkers (in /etc/beegfs/beegfs-X.conf). In general, a higher number of workers allows for more parallelism (e.g. a server will work on more client requests in parallel). But a higher number of workers also results in more concurrent disk access, so especially on the storage servers, the ideal number of workers may depend on the number of disks that you are using.
+
+[root@storage-server-1 ~]# less /etc/beegfs/beegfs-storage.conf | grep tuneNumWorkers
+tuneNumWorkers               = 12
+
+I can have 1 till 31 disk attached to each node.  With each disk ability to deliver 480MB/s and having a 25Gpbs (3125 MB/s) n/w pipe,  I need min of 8 disk accessed concurrently to fill the n/w pipe.
+If I do 8 disk ,  what should be tuneNumWorkers?
+If I do 12 disk ,  what should be tuneNumWorkers?
+If I do 16 disk ,  what should be tuneNumWorkers?
+If I do 30 disk ,  what should be tuneNumWorkers?
+
+
+
+Should i change this:
+https://www.beegfs.io/wiki/StorageServerTuning#hn_59ca4f8bbb_9
+Virtual Memory Settings
+
+Current settings:
+echo 5 > /proc/sys/vm/dirty_background_ratio
+echo 20 > /proc/sys/vm/dirty_ratio
+
+
+Client nodes:
+https://www.beegfs.io/wiki/ClientTuning
+Should connMaxInternodeNum be  set to #ofphysical cores or vcpus?
+
+
+
+https://www.beegfs.io/wiki/NetworkTuning
+TCP window scaling, buffer sizes and timestamps.
+
+echo "net.ipv4.tcp_timestamps = 0" >> /etc/sysctl.conf
+echo "net.ipv4.tcp_window_scaling = 1" >> /etc/sysctl.conf
+echo "net.ipv4.tcp_adv_win_scale=1" >> /etc/sysctl.conf
+echo "net.ipv4.tcp_low_latency=1" >> /etc/sysctl.conf
+echo "net.ipv4.tcp_sack = 1" >> /etc/sysctl.conf
+
+
+echo "net.core.wmem_max=16777216" >> /etc/sysctl.conf
+echo "net.core.rmem_max=16777216" >> /etc/sysctl.conf
+echo "net.core.wmem_default=16777216" >> /etc/sysctl.conf
+echo "net.core.rmem_default=16777216" >> /etc/sysctl.conf
+echo "net.core.optmem_max=16777216" >> /etc/sysctl.conf
+echo "net.core.netdev_max_backlog=27000" >> /etc/sysctl.conf
+
+echo "net.ipv4.tcp_rmem = 212992 87380 16777216" >> /etc/sysctl.conf
+echo "net.ipv4.tcp_wmem = 212992 65536 16777216" >> /etc/sysctl.conf
+
+
+
+function tune_nics() {
+nic_lst=$(ifconfig | grep " flags" | grep -v "^lo:" | gawk -F":" '{ print $1 }' | sort) ; echo $nic_lst
+for nic in $nic_lst
+do
+ethtool -G $nic rx 2047 tx 2047 rx-jumbo 8191
+done
+}
+
+
+For Ethernet, it is also very important to enable send and receive flow-control on the network cards (e.g. with ethtool) and on the switch. You also need to disable broadcast or storm control settings on your Ethernet switch to make sure they don't interfere with the highly concurrent parallel file streams.
+
+
+
+Currently using:
+beegfs-ctl --setpattern --chunksize=1m --numtargets=4 /mnt/beegfs
+
+should i use more numtargets, like 8 , so the total throughput matches n/w pipe ?
+If my client app does r/w of 2MB, should i set the chunksize=2m or still use chunksize=1m
+
+
+Impact on network communication
+https://www.beegfs.io/wiki/Striping#hn_59ca4f8bbb_2
+
+Increase data_chunk size (stripe size)
+
+
+[root@client-1 ~]# less /etc/beegfs/beegfs-client.conf | grep tuneFileCacheBufSize
+# [tuneFileCacheBufSize]
+# write() passes a buffer size larger than tuneFileCacheBufSize the client will
+[root@client-1 ~]# less /etc/beegfs/beegfs-client.conf | grep tuneFileCacheType
+tuneFileCacheType             = buffered
+# [tuneFileCacheType]
+# tuneFileCacheType=buffered and the page cache.
+# system calls, the buffers used by tuneFileCacheType=buffered and the page
+# though they had been opened with tuneFileCacheType=none
+[root@client-1 ~]#
+
+You also have to consider the file cache settings. When the client is using the buffered cache (tuneFileCacheType = buffered), it uses a file cache buffer of 512 KB to accumulate changes on the same data. This data is sent to the servers only when data from outside the boundaries of that buffer is needed by the client. So, the larger this buffer, the less communication will be needed between the client and the servers. You should set this buffer size to a multiple of the data chunk size. For example, adding tuneFileCacheBufSize = 2097152 to the BeeGFS client configuration file will raise the file cache buffer size to 2 MB.
+
+So set value to 2MB for tuneFileCacheBufSize ?
+
+

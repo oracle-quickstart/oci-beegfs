@@ -55,3 +55,11 @@ echo "net.ipv4.tcp_wmem = 212992 65536 16777216" >> /etc/sysctl.conf
 
 # Call the functions
 tune_nics
+
+
+tuned-adm profile throughput-performance
+
+
+# Concurrency Tuning - Worker Threads
+# Storage servers, metadata servers and clients allow you to control the number of worker threads by setting the value of tuneNumWorkers (in /etc/beegfs/beegfs-X.conf). In general, a higher number of workers allows for more parallelism (e.g. a server will work on more client requests in parallel). But a higher number of workers also results in more concurrent disk access, so especially on the storage servers, the ideal number of workers may depend on the number of disks that you are using.
+sed -i 's/tuneNumWorkers.*=.*/tuneNumWorkers               = 64/g' /etc/beegfs/beegfs-storage.conf

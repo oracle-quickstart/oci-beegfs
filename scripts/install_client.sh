@@ -2,12 +2,12 @@ set -x
 
 
 # For OL UEK
-sudo yum install "kernel-uek-devel-uname-r == $(uname -r)"
+sudo yum install -y "kernel-uek-devel-uname-r == $(uname -r)"
 
 # To install a kernel-uek-devel version which is for the installed kernel version.
 
 # For CentOS
-sudo yum install "kernel-devel-uname-r == $(uname -r)"
+sudo yum install -y "kernel-devel-uname-r == $(uname -r)" 
 if [ $? -eq 0 ]; then
   echo "found correct rpm"
 else
@@ -56,6 +56,10 @@ sed -i "s|/mnt/beegfs|${mount_point}|g"  /etc/beegfs/beegfs-mounts.conf
 
 # client tuning
 sed -i 's/connMaxInternodeNum.*= 12/connMaxInternodeNum          = 24/g'  /etc/beegfs/beegfs-client.conf
+# https://www.beegfs.io/wiki/Striping
+echo "tuneFileCacheBufSize = 2097152" >> /etc/beegfs/beegfs-client.conf
+
+
 
 # Start services.  They create log files here:  /var/log/beegfs-...
 systemctl start beegfs-helperd ; systemctl status beegfs-helperd
