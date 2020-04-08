@@ -64,10 +64,10 @@ resource "oci_core_instance" "metadata_server" {
   count               = var.metadata_server_node_count
   availability_domain = local.ad
   fault_domain        = "FAULT-DOMAIN-${(count.index%3)+1}"
-  compartment_id      = "${var.compartment_ocid}"
+  compartment_id      = var.compartment_ocid
   display_name        = "${var.metadata_server_hostname_prefix}${format("%01d", count.index+1)}"
   hostname_label      = "${var.metadata_server_hostname_prefix}${format("%01d", count.index+1)}"
-  shape               = "${var.metadata_server_shape}"
+  shape               = var.metadata_server_shape
   subnet_id           = local.storage_subnet_id
 
   source_details {
@@ -117,10 +117,10 @@ resource "oci_core_instance" "storage_server" {
   count               = var.storage_server_node_count
   availability_domain = local.ad
   fault_domain        = "FAULT-DOMAIN-${(count.index%3)+1}"
-  compartment_id      = "${var.compartment_ocid}"
+  compartment_id      = var.compartment_ocid
   display_name        = "${var.storage_server_hostname_prefix}${format("%01d", count.index+1)}"
   hostname_label      = "${var.storage_server_hostname_prefix}${format("%01d", count.index+1)}"
-  shape               = "${var.storage_server_shape}"
+  shape               = var.storage_server_shape
   subnet_id           = local.storage_subnet_id
 
   source_details {

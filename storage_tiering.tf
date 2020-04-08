@@ -32,11 +32,11 @@ resource "oci_core_volume_attachment" "storage_tier_blockvolume_attach" {
         count.index % var.storage_server_node_count,
       )
       user                = var.ssh_user
-      private_key         = "${tls_private_key.ssh.private_key_pem}"
+      private_key         = tls_private_key.ssh.private_key_pem
       bastion_host        = oci_core_instance.bastion[0].public_ip
       bastion_port        = "22"
       bastion_user        = var.ssh_user
-      bastion_private_key = "${tls_private_key.ssh.private_key_pem}"
+      bastion_private_key = tls_private_key.ssh.private_key_pem
 
     }
 
@@ -57,13 +57,13 @@ resource "null_resource" "notify_storage_server_nodes_block_attach_complete" {
     connection {
         agent               = false
         timeout             = "30m"
-        host                = "${element(oci_core_instance.storage_server.*.private_ip, count.index)}"
-        user                = "${var.ssh_user}"
-        private_key         = "${tls_private_key.ssh.private_key_pem}"
-        bastion_host        = "${oci_core_instance.bastion.*.public_ip[0]}"
+        host                = element(oci_core_instance.storage_server.*.private_ip, count.index)
+        user                = var.ssh_user
+        private_key         = tls_private_key.ssh.private_key_pem
+        bastion_host        = oci_core_instance.bastion.*.public_ip[0]
         bastion_port        = "22"
-        bastion_user        = "${var.ssh_user}"
-        bastion_private_key = "${tls_private_key.ssh.private_key_pem}"
+        bastion_user        = var.ssh_user
+        bastion_private_key = tls_private_key.ssh.private_key_pem
     }
     inline = [
       "set -x",

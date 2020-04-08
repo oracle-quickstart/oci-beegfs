@@ -6,7 +6,7 @@
 variable "vpc_cidr" { default = "10.0.0.0/16" }
 
 
-variable bastion_shape { default = "VM.Standard.E2.2" }
+variable bastion_shape { default = "VM.Standard2.2" }
 variable bastion_node_count { default = 1 }
 variable bastion_hostname_prefix { default = "bastion-" }
 
@@ -16,31 +16,31 @@ variable management_server_shape { default = "VM.Standard2.2" }
 variable management_server_node_count { default = 1 }
 variable management_server_disk_count { default = 1 }
 variable management_server_disk_size { default = 50 }
-# Block volume elastic performance tier.  The number of volume performance units (VPUs) that will be applied to this volume per GB, representing the Block Volume service's elastic performance options. See https://docs.cloud.oracle.com/en-us/iaas/Content/Block/Concepts/blockvolumeelasticperformance.htm for more information.  Allowed values are 0, 10, and 20.  Recommended value is 10 for balanced performance and 20 to receive higher performance (IO throughput and IOPS) per GB.
-variable management_server_disk_vpus_per_gb { default = "10" }
+# Block volume elastic performance tier.  The number of volume performance units (VPUs) that will be applied to this volume per GB, representing the Block Volume service's elastic performance options. See https://docs.cloud.oracle.com/en-us/iaas/Content/Block/Concepts/blockvolumeelasticperformance.htm for more information.  Allowed values are High, Balanced, and Low.  Recommended value is Balanced for balanced performance and High to receive higher performance (IO throughput and IOPS) per GB.
+variable management_server_disk_vpus_per_gb { default = "Balanced" }
 variable management_server_hostname_prefix { default = "mgs-server-" }
 
 
 
 # BeeGFS Metadata (MDS) Server nodes variables
-variable metadata_server_shape { default = "VM.Standard2.2" }
+variable metadata_server_shape { default = "VM.Standard2.8" }
 variable metadata_server_node_count { default = 1 }
 # if disk_count > 1, then it create multiple MDS instance, each with 1 disk as MDT for optimal performance. If node has both local nvme ssd and block storage, block storage volumes will be ignored.
 variable metadata_server_disk_count { default = 1 }
-variable metadata_server_disk_size { default = 50 }
-# Block volume elastic performance tier.  The number of volume performance units (VPUs) that will be applied to this volume per GB, representing the Block Volume service's elastic performance options. See https://docs.cloud.oracle.com/en-us/iaas/Content/Block/Concepts/blockvolumeelasticperformance.htm for more information.  Allowed values are 0, 10, and 20.  Recommended value is 10 for balanced performance and 20 to receive higher performance (IO throughput and IOPS) per GB.
-variable metadata_server_disk_vpus_per_gb { default = "20" }
+variable metadata_server_disk_size { default = 500 }
+# Block volume elastic performance tier.  The number of volume performance units (VPUs) that will be applied to this volume per GB, representing the Block Volume service's elastic performance options. See https://docs.cloud.oracle.com/en-us/iaas/Content/Block/Concepts/blockvolumeelasticperformance.htm for more information.  Allowed values are High, Balanced, and Low.  Recommended value is Balanced for balanced performance and High to receive higher performance (IO throughput and IOPS) per GB.
+variable metadata_server_disk_vpus_per_gb { default = "High" }
 variable metadata_server_hostname_prefix { default = "metadata-server-" }
 
 
 
 # BeeGFS Stoarage/Object (OSS) Server nodes variables
-variable storage_server_shape { default = "VM.Standard2.2" }
+variable storage_server_shape { default = "BM.Standard2.52" }
 variable storage_server_node_count { default = 2 }
 variable storage_server_hostname_prefix { default = "storage-server-" }
 
 # Client nodes variables
-variable client_node_shape { default = "VM.Standard2.2" }
+variable client_node_shape { default = "VM.Standard2.24" }
 variable client_node_count { default = 1 }
 variable client_node_hostname_prefix { default = "client-" }
 
@@ -53,10 +53,9 @@ variable beegfs_mount_point { default = "/mnt/beegfs" }
 # To be supported in future
 variable beegfs_high_availability { default = false }
 
-
 # This is currently used for the deployment.  
 variable "ad_number" {
-  default = "2"
+  default = "-1"
 }
 
 
@@ -81,7 +80,7 @@ variable "storage_tier_4_disk_type" {
 }
 
 variable "storage_tier_1_disk_count" {
-  default = "2"
+  default = "8"
   description = "Number of local NVMe SSD/block volume disk. Each attached as JBOD (no RAID)."
 }
 
@@ -102,7 +101,7 @@ variable "storage_tier_4_disk_count" {
 
 
 variable "storage_tier_1_disk_size" {
-  default = "50"
+  default = "800"
   description = "If Storage Tier Disk Type is Local_NVMe_SSD, then this field will be ignored.  Otherwise set Size in GB for each block volume/disk, min 50."
 }
 
@@ -149,7 +148,7 @@ locals {
   storage_server_hpc_shape = (length(regexall("HPC2", var.storage_server_shape)) > 0 ? true : false)
 
   storage_subnet_domain_name=("${data.oci_core_subnet.storage_subnet.dns_label}.${data.oci_core_vcn.beegfs.dns_label}.oraclevcn.com" )
-  filesystem_subnet_domain_name=("${data.oci_core_subnet.fs_subnet.dns_label}.${data.oci_core_vcn.beegfs.dns_label}.oraclevcn.com" )
+  filesystem_subnet_domain_name=(length(regexall("HPC2", var.storage_server_shape)) > 0 ?  ("${data.oci_core_subnet.storage_subnet.dns_label}.${data.oci_core_vcn.beegfs.dns_label}.oraclevcn.com") : ("${data.oci_core_subnet.fs_subnet.dns_label}.${data.oci_core_vcn.beegfs.dns_label}.oraclevcn.com") )
   vcn_domain_name=("${data.oci_core_vcn.beegfs.dns_label}.oraclevcn.com" )
   client_domain_name=("${data.oci_core_subnet.client_subnet.dns_label}.${data.oci_core_vcn.beegfs.dns_label}.oraclevcn.com" )
 
@@ -256,10 +255,10 @@ variable "volume_attach_device_mapping" {
 variable "volume_type_vpus_per_gb_mapping" {
   type = map(string)
   default = {
-    "High" = "20"
-    "Balanced" = "10"
-    "Low" = "0"
-    "None" = "-1"
+    "High"     = 20
+    "Balanced" = 10
+    "Low"      = 0
+    "None"     = -1
   }
 }
 
