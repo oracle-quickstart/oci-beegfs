@@ -18,7 +18,8 @@ resource "oci_core_vnic_attachment" "storage_server_secondary_vnic_attachment" {
   instance_id = element(oci_core_instance.storage_server.*.id, count.index)
 
   # set to 1, if you want to use 2nd physical NIC for this VNIC
-  nic_index = (local.storage_server_dual_nics ? "1" : "0")
+  nic_index = (local.storage_server_dual_nics ? (local.storage_server_hpc_shape ? "0" : "1") : "0")
+
 }
 
 resource "oci_core_vnic_attachment" "metadata_server_secondary_vnic_attachment" {
@@ -40,7 +41,9 @@ resource "oci_core_vnic_attachment" "metadata_server_secondary_vnic_attachment" 
   instance_id = element(oci_core_instance.metadata_server.*.id, count.index)
 
   # set to 1, if you want to use 2nd physical NIC for this VNIC
-  nic_index = (local.metadata_server_dual_nics ? "1" : "0")
+  #nic_index = (local.metadata_server_dual_nics ? "1" : "0")
+  nic_index = (local.metadata_server_dual_nics ? (local.metadata_server_hpc_shape ? "0" : "1") : "0")
+
 }
 
 

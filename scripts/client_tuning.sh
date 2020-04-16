@@ -1,7 +1,7 @@
 
 
 function tune_nics() {
-  nic_lst=$(ifconfig | grep " flags" | grep -v "^lo:" | gawk -F":" '{ print $1 }' | sort) ; echo $nic_lst
+  nic_lst=$(ifconfig | grep " flags" | egrep -v "^lo:|^enp94s0f0:" | gawk -F":" '{ print $1 }' | sort) ; echo $nic_lst
   for nic in $nic_lst
   do
     ethtool -G $nic rx 2047 tx 2047 rx-jumbo 8191

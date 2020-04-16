@@ -144,13 +144,13 @@ variable "ssh_user" { default = "opc" }
 locals {
   management_server_dual_nics = (length(regexall("^BM", var.management_server_shape)) > 0 ? true : false)
   metadata_server_dual_nics = (length(regexall("^BM", var.metadata_server_shape)) > 0 ? true : false)
+  metadata_server_hpc_shape = (length(regexall("HPC2", var.metadata_server_shape)) > 0 ? true : false)
   storage_server_dual_nics = (length(regexall("^BM", var.storage_server_shape)) > 0 ? true : false)
   storage_server_hpc_shape = (length(regexall("HPC2", var.storage_server_shape)) > 0 ? true : false)
 
   storage_subnet_domain_name=("${data.oci_core_subnet.storage_subnet.dns_label}.${data.oci_core_vcn.beegfs.dns_label}.oraclevcn.com" )
-  filesystem_subnet_domain_name=(length(regexall("HPC2", var.storage_server_shape)) > 0 ?  ("${data.oci_core_subnet.storage_subnet.dns_label}.${data.oci_core_vcn.beegfs.dns_label}.oraclevcn.com") : ("${data.oci_core_subnet.fs_subnet.dns_label}.${data.oci_core_vcn.beegfs.dns_label}.oraclevcn.com") )
+  filesystem_subnet_domain_name=( "${data.oci_core_subnet.fs_subnet.dns_label}.${data.oci_core_vcn.beegfs.dns_label}.oraclevcn.com" )
   vcn_domain_name=("${data.oci_core_vcn.beegfs.dns_label}.oraclevcn.com" )
-  client_domain_name=("${data.oci_core_subnet.client_subnet.dns_label}.${data.oci_core_vcn.beegfs.dns_label}.oraclevcn.com" )
 
   management_server_filesystem_vnic_hostname_prefix = "${var.management_server_hostname_prefix}fs-vnic-"
   metadata_server_filesystem_vnic_hostname_prefix = "${var.metadata_server_hostname_prefix}fs-vnic-"

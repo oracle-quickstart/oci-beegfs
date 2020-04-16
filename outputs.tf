@@ -22,9 +22,7 @@ value = <<END
         storage_subnet_domain_name="${data.oci_core_subnet.storage_subnet.dns_label}.${data.oci_core_vcn.beegfs.dns_label}.oraclevcn.com"
         filesystem_subnet_domain_name="${data.oci_core_subnet.fs_subnet.dns_label}.${data.oci_core_vcn.beegfs.dns_label}.oraclevcn.com"
         vcn_domain_name="${data.oci_core_vcn.beegfs.dns_label}.oraclevcn.com"
-        client_domain_name="${data.oci_core_subnet.client_subnet.dns_label}.${data.oci_core_vcn.beegfs.dns_label}.oraclevcn.com"
 
 END
 }
-
 
