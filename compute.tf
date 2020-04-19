@@ -7,8 +7,6 @@ locals {
   storage_subnet_id = var.use_existing_vcn ? var.storage_subnet_id : element(concat(oci_core_subnet.storage.*.id, [""]), 0)
   fs_subnet_id      = var.use_existing_vcn ? var.fs_subnet_id : element(concat(oci_core_subnet.fs.*.id, [""]), 0)
   client_subnet_id  = var.use_existing_vcn ? var.fs_subnet_id : element(concat(oci_core_subnet.fs.*.id, [""]), 0)
-#client_subnet_id  = var.use_existing_vcn ? var.fs_subnet_id : (local.storage_server_hpc_shape ? element(concat(oci_core_subnet.storage.*.id, [""]), 0) : element(concat(oci_core_subnet.fs.*.id, [""]), 0) )
-
   image_id          = (var.use_marketplace_image ? var.mp_listing_resource_id : var.images[var.region])
 }
 
@@ -51,6 +49,7 @@ resource "oci_core_instance" "management_server" {
         "filesystem_subnet_domain_name=\"${local.filesystem_subnet_domain_name}\"",
         "vcn_domain_name=\"${local.vcn_domain_name}\"",
         file("${var.scripts_directory}/firewall.sh"),
+        file("${var.scripts_directory}/update_resolv_conf.sh"),
         file("${var.scripts_directory}/install_management.sh")
       )))}"
     }
@@ -102,6 +101,7 @@ resource "oci_core_instance" "metadata_server" {
         "filesystem_subnet_domain_name=\"${local.filesystem_subnet_domain_name}\"",
         "vcn_domain_name=\"${local.vcn_domain_name}\"",
         file("${var.scripts_directory}/firewall.sh"),
+        file("${var.scripts_directory}/update_resolv_conf.sh"),
         file("${var.scripts_directory}/install_metadata.sh"),
         file("${var.scripts_directory}/metadata_tuning.sh")
       )))}"
@@ -148,7 +148,7 @@ resource "oci_core_instance" "storage_server" {
         "server_node_count=\"${var.storage_server_node_count}\"",
         "management_server_filesystem_vnic_hostname_prefix=\"${local.management_server_filesystem_vnic_hostname_prefix}\"",
         "metadata_server_filesystem_vnic_hostname_prefix=\"${local.metadata_server_filesystem_vnic_hostname_prefix}\"",
-        "storage_server_filesystem_vnic_hostname_prefix=\"${local.metadata_server_filesystem_vnic_hostname_prefix}\"",
+        "storage_server_filesystem_vnic_hostname_prefix=\"${local.storage_server_filesystem_vnic_hostname_prefix}\"",
         "storage_subnet_domain_name=\"${local.storage_subnet_domain_name}\"",
         "filesystem_subnet_domain_name=\"${local.filesystem_subnet_domain_name}\"",
         "vcn_domain_name=\"${local.vcn_domain_name}\"",
@@ -165,6 +165,7 @@ resource "oci_core_instance" "storage_server" {
         "storage_tier_4_disk_count=\"${var.storage_tier_4_disk_count}\"",
         "storage_tier_4_disk_size=\"${var.storage_tier_4_disk_size}\"",
         file("${var.scripts_directory}/firewall.sh"),
+        file("${var.scripts_directory}/update_resolv_conf.sh"),
         file("${var.scripts_directory}/install_storage.sh"),
         file("${var.scripts_directory}/storage_tuning.sh"),
       )))}"
@@ -213,8 +214,14 @@ resource "oci_core_instance" "client_node" {
         "storage_subnet_domain_name=\"${local.storage_subnet_domain_name}\"",
         "filesystem_subnet_domain_name=\"${local.filesystem_subnet_domain_name}\"",
         "vcn_domain_name=\"${local.vcn_domain_name}\"",
+        "management_server_node_count=\"${var.management_server_node_count}\"",
+        "metadata_server_node_count=\"${var.metadata_server_node_count}\"",
+        "storage_server_node_count=\"${var.storage_server_node_count}\"",
+        "metadata_server_filesystem_vnic_hostname_prefix=\"${local.metadata_server_filesystem_vnic_hostname_prefix}\"",
+        "storage_server_filesystem_vnic_hostname_prefix=\"${local.storage_server_filesystem_vnic_hostname_prefix}\"",
         file("${var.scripts_directory}/firewall.sh"),
-        file("${var.scripts_directory}/install_client.sh")
+        file("${var.scripts_directory}/install_client.sh"),
+        file("${var.scripts_directory}/update_etc_hosts.sh"),
       )))}"
     }
 

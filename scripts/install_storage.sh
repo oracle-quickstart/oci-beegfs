@@ -138,6 +138,16 @@ done
 sed -i 's/connMaxInternodeNum.*= 12/connMaxInternodeNum          = 24/g'  /etc/beegfs/beegfs-storage.conf
 sed -i 's/storeAllowFirstRunInit.*= false/storeAllowFirstRunInit       = true/g'  /etc/beegfs/beegfs-storage.conf
 
+# Update beegfs files to use 2nd VNIC only, otherwise nodes will try 1st VNIC and then 2nd. It results in high latency.
+privateIp=`curl -s http://169.254.169.254/opc/v1/vnics/ | jq '.[1].privateIp ' | sed 's/"//g' ` ; echo $privateIp
+interface=`ip addr | grep -B2 $privateIp | grep "BROADCAST" | gawk -F ":" ' { print $2 } ' | sed -e 's/^[ \t]*//'` ; echo $interface
+type="storage"
+cat /etc/beegfs/beegfs-${type}.conf | grep "^connInterfacesFile"
+echo "$interface" > /etc/beegfs/${type}-connInterfacesFile.conf
+sed -i "s|connInterfacesFile.*=.*|connInterfacesFile          = /etc/beegfs/${type}-connInterfacesFile.conf|g"  /etc/beegfs/beegfs-${type}.conf
+cat /etc/beegfs/beegfs-${type}.conf | grep "^connInterfacesFile"
+cat /etc/beegfs/${type}-connInterfacesFile.conf
+
 # Start services.  They create log files here:  /var/log/beegfs-...
 systemctl start beegfs-storage ; systemctl status beegfs-storage
 systemctl enable beegfs-storage

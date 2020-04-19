@@ -98,6 +98,17 @@ EOF
   done
 
 
+  # Update beegfs files to use 2nd VNIC only, otherwise nodes will try 1st VNIC and then 2nd. It results in high latency.
+  privateIp=`curl -s http://169.254.169.254/opc/v1/vnics/ | jq '.[1].privateIp ' | sed 's/"//g' ` ; echo $privateIp
+  interface=`ip addr | grep -B2 $privateIp | grep "BROADCAST" | gawk -F ":" ' { print $2 } ' | sed -e 's/^[ \t]*//'` ; echo $interface
+  type="mgmtd"
+  cat /etc/beegfs/beegfs-${type}.conf | grep "^connInterfacesFile"
+  echo "$interface" > /etc/beegfs/${type}-connInterfacesFile.conf
+  sed -i "s|connInterfacesFile.*=.*|connInterfacesFile          = /etc/beegfs/${type}-connInterfacesFile.conf|g"  /etc/beegfs/beegfs-${type}.conf
+  cat /etc/beegfs/beegfs-${type}.conf | grep "^connInterfacesFile"
+  cat /etc/beegfs/${type}-connInterfacesFile.conf
+
+
   # Start services.  They create log files here:  /var/log/beegfs-...
   systemctl start beegfs-mgmtd ; systemctl status beegfs-mgmtd
   systemctl enable beegfs-mgmtd

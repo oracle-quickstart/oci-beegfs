@@ -22,25 +22,26 @@ variable management_server_hostname_prefix { default = "mgs-server-" }
 
 
 
-# BeeGFS Metadata (MDS) Server nodes variables
-variable metadata_server_shape { default = "VM.Standard2.8" }
+# BeeGFS Metadata (MDS) Server nodes variables  #VM.Standard2.8
+variable metadata_server_shape { default = "VM.Standard2.2" }
 variable metadata_server_node_count { default = 1 }
 # if disk_count > 1, then it create multiple MDS instance, each with 1 disk as MDT for optimal performance. If node has both local nvme ssd and block storage, block storage volumes will be ignored.
 variable metadata_server_disk_count { default = 1 }
-variable metadata_server_disk_size { default = 500 }
+# 500
+variable metadata_server_disk_size { default = 50 }
 # Block volume elastic performance tier.  The number of volume performance units (VPUs) that will be applied to this volume per GB, representing the Block Volume service's elastic performance options. See https://docs.cloud.oracle.com/en-us/iaas/Content/Block/Concepts/blockvolumeelasticperformance.htm for more information.  Allowed values are High, Balanced, and Low.  Recommended value is Balanced for balanced performance and High to receive higher performance (IO throughput and IOPS) per GB.
 variable metadata_server_disk_vpus_per_gb { default = "High" }
 variable metadata_server_hostname_prefix { default = "metadata-server-" }
 
 
 
-# BeeGFS Stoarage/Object (OSS) Server nodes variables
-variable storage_server_shape { default = "BM.Standard2.52" }
+# BeeGFS Stoarage/Object (OSS) Server nodes variables BM.Standard2.52
+variable storage_server_shape { default = "VM.Standard2.2" }
 variable storage_server_node_count { default = 2 }
 variable storage_server_hostname_prefix { default = "storage-server-" }
 
-# Client nodes variables
-variable client_node_shape { default = "VM.Standard2.24" }
+# Client nodes variables VM.Standard2.24
+variable client_node_shape { default = "VM.Standard2.2" }
 variable client_node_count { default = 1 }
 variable client_node_hostname_prefix { default = "client-" }
 
@@ -79,8 +80,9 @@ variable "storage_tier_4_disk_type" {
   description = "Select None or block volume storage types (high, balanced, low) based on your performance needs. Valid values are None or Low."
 }
 
+# 8
 variable "storage_tier_1_disk_count" {
-  default = "8"
+  default = "2"
   description = "Number of local NVMe SSD/block volume disk. Each attached as JBOD (no RAID)."
 }
 
@@ -99,9 +101,9 @@ variable "storage_tier_4_disk_count" {
   description = "Number of block volume/disk. Each attached as JBOD (no RAID)."
 }
 
-
+# 800
 variable "storage_tier_1_disk_size" {
-  default = "800"
+  default = "50"
   description = "If Storage Tier Disk Type is Local_NVMe_SSD, then this field will be ignored.  Otherwise set Size in GB for each block volume/disk, min 50."
 }
 

@@ -56,6 +56,7 @@ do
   sed -i 's/connMaxInternodeNum.*= 32/connMaxInternodeNum          = 32/g'  ${conf_file}
   sed -i 's/storeAllowFirstRunInit.*= false/storeAllowFirstRunInit       = true/g'  ${conf_file}
 
+  sed -i "s|connInterfacesFile.*=.*|connInterfacesFile          = /etc/beegfs/${type}-connInterfacesFile.conf|g"  ${conf_file}
 
   if [ $disk_cnt -ge 2 ]; then
     service_name="beegfs-meta@meta${count}"
@@ -139,6 +140,11 @@ yum install beegfs-meta -y
 
 
 configure_vnics
+
+privateIp=`curl -s http://169.254.169.254/opc/v1/vnics/ | jq '.[1].privateIp ' | sed 's/"//g' ` ; echo $privateIp
+interface=`ip addr | grep -B2 $privateIp | grep "BROADCAST" | gawk -F ":" ' { print $2 } ' | sed -e 's/^[ \t]*//'` ; echo $interface
+type="meta"
+echo "$interface" > /etc/beegfs/${type}-connInterfacesFile.conf
 
 
 # Extract value "n" from any hostname like storage-server-n. n>=1
