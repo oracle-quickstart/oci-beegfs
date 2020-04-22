@@ -22,6 +22,9 @@ Deploy using standard Terraform commands
 
         terraform init
         terraform plan
-        terraform apply
+
+Pass ad_number=2, if you want to deploy to Availability-Domain-3. similarly use 0 for AD-1, 1 for AD-2. 
+
+        terraform apply -var="ad_number=2"
 
 ![](./images/TF-apply.PNG)

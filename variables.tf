@@ -26,7 +26,7 @@ variable management_server_hostname_prefix { default = "mgs-server-" }
 variable metadata_server_shape { default = "VM.Standard2.2" }
 variable metadata_server_node_count { default = 1 }
 # if disk_count > 1, then it create multiple MDS instance, each with 1 disk as MDT for optimal performance. If node has both local nvme ssd and block storage, block storage volumes will be ignored.
-variable metadata_server_disk_count { default = 1 }
+variable metadata_server_disk_count { default = 2 }
 # 500
 variable metadata_server_disk_size { default = 50 }
 # Block volume elastic performance tier.  The number of volume performance units (VPUs) that will be applied to this volume per GB, representing the Block Volume service's elastic performance options. See https://docs.cloud.oracle.com/en-us/iaas/Content/Block/Concepts/blockvolumeelasticperformance.htm for more information.  Allowed values are High, Balanced, and Low.  Recommended value is Balanced for balanced performance and High to receive higher performance (IO throughput and IOPS) per GB.
@@ -145,6 +145,7 @@ variable "ssh_user" { default = "opc" }
 
 locals {
   management_server_dual_nics = (length(regexall("^BM", var.management_server_shape)) > 0 ? true : false)
+  management_server_hpc_shape = (length(regexall("HPC2", var.management_server_shape)) > 0 ? true : false)
   metadata_server_dual_nics = (length(regexall("^BM", var.metadata_server_shape)) > 0 ? true : false)
   metadata_server_hpc_shape = (length(regexall("HPC2", var.metadata_server_shape)) > 0 ? true : false)
   storage_server_dual_nics = (length(regexall("^BM", var.storage_server_shape)) > 0 ? true : false)

@@ -16,9 +16,12 @@ value = <<END
 END
 }
 
-output "Subnet_Domain_Name" {
+output "Filesystem-Details" {
 value = <<END
 
+        BeeGFS Management Service Hostname: ${local.management_server_filesystem_vnic_hostname_prefix}1.${local.filesystem_subnet_domain_name}
+        Mount Point:  ${var.beegfs_mount_point}
+        Striping:  beegfs-ctl --setpattern --chunksize=${var.beegfs_stripe_size} --numtargets=4 ${var.beegfs_mount_point}
         storage_subnet_domain_name="${data.oci_core_subnet.storage_subnet.dns_label}.${data.oci_core_vcn.beegfs.dns_label}.oraclevcn.com"
         filesystem_subnet_domain_name="${data.oci_core_subnet.fs_subnet.dns_label}.${data.oci_core_vcn.beegfs.dns_label}.oraclevcn.com"
         vcn_domain_name="${data.oci_core_vcn.beegfs.dns_label}.oraclevcn.com"

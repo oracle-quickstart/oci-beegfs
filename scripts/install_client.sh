@@ -1,24 +1,42 @@
 set -x
 
+# Disable SELinux
+cp /etc/selinux/config /etc/selinux/config.backup
+sed -i 's/SELINUX=enforcing/SELINUX=disabled/g' /etc/selinux/config
+setenforce 0
+
 
 # For OL UEK
-sudo yum install -y "kernel-uek-devel-uname-r == $(uname -r)"
-
 # To install a kernel-uek-devel version which is for the installed kernel version.
-
-# For CentOS
-sudo yum install -y "kernel-devel-uname-r == $(uname -r)" 
+uname -r | grep "uek.x86_64$"
 if [ $? -eq 0 ]; then
-  echo "found correct rpm"
+  echo "Oracle Linux UEK kernel found"
+  sudo yum install -y "kernel-uek-devel-uname-r == $(uname -r)"
 else
-  kernelVersion=`uname -a  | gawk -F" " '{ print $3 }' ` ; echo $kernelVersion
-  yum install -y redhat-lsb-core
-  lsb_release -a
-  fullOSReleaseVersion=`lsb_release -a | grep "Release:" | gawk -F" " '{ print $2 }'` ; echo $fullOSReleaseVersion
-  rpmDownloadURLPrefix="http://archive.kernel.org/centos-vault/${fullOSReleaseVersion}/updates/x86_64/Packages"
-  curl -O ${rpmDownloadURLPrefix}/kernel-devel-${kernelVersion}.rpm
-  rpm -Uvh kernel-devel-${kernelVersion}.rpm  --oldpackage
+    cat /etc/os-release | grep "^NAME=" | grep "CentOS"
+    if [ $? -eq 0 ]; then
+        # For CentOS
+        sudo yum install -y "kernel-devel-uname-r == $(uname -r)"
+        if [ $? -eq 0 ]; then
+          echo "found correct rpm"
+        else
+          kernelVersion=`uname -a  | gawk -F" " '{ print $3 }' ` ; echo $kernelVersion
+          yum install -y redhat-lsb-core
+          lsb_release -a
+          fullOSReleaseVersion=`lsb_release -a | grep "Release:" | gawk -F" " '{ print $2 }'` ; echo $fullOSReleaseVersion
+          rpmDownloadURLPrefix="http://archive.kernel.org/centos-vault/${fullOSReleaseVersion}/updates/x86_64/Packages"
+          curl -O ${rpmDownloadURLPrefix}/kernel-devel-${kernelVersion}.rpm
+          rpm -Uvh kernel-devel-${kernelVersion}.rpm  --oldpackage
+        fi
+    fi
+
+    cat /etc/os-release | grep "^NAME=" | grep -i "Oracle"
+    if [ $? -eq 0 ]; then
+      sudo yum install -y "kernel-devel-uname-r == $(uname -r)"
+    fi
 fi
+
+
 
 
 ###### Commented this out - since I found a better way above  ######
@@ -45,6 +63,25 @@ wget -O /etc/yum.repos.d/beegfs_rhel7.repo https://www.beegfs.io/release/latest-
 
 # client and command-line utils
 yum install beegfs-client beegfs-helperd beegfs-utils -y
+
+# For OL UEK
+# To install a kernel-uek-devel version which is for the installed kernel version.
+uname -r | grep "uek.x86_64$"
+if [ $? -eq 0 ]; then
+  echo "Oracle Linux UEK kernel found"
+  sudo yum install -y elfutils-libelf-devel
+  #  Fix for OL UEK for beegfs rebuild to work.  Should be ran after beegfs-client is installed.
+  sed -i -e '/ifeq.*compat-2.6.h/,+3 s/^/# /' /opt/beegfs/src/client/client_module_7/source/Makefile
+fi
+
+# check if clustered networking is setup for the client HPC nodes.  if yes, rebuild beegfs with rdma even if you do not plan to use RDMA for FS. This is required, since RDMA NIC is enabled.
+ifconfig | grep -A2  enp94s0f0 | grep inet
+if [ $? -eq 0 ]; then
+  sed -i 's|^buildArgs=-j8|buildArgs=-j8 BEEGFS_OPENTK_IBVERBS=1 OFED_INCLUDE_PATH=/usr/src/ofa_kernel/default/include|g' /etc/beegfs/beegfs-client-autobuild.conf
+  # Run rebuild command
+  /etc/init.d/beegfs-client rebuild
+fi
+
 
 # client setup
 /opt/beegfs/sbin/beegfs-setup-client -m ${management_server_filesystem_vnic_hostname_prefix}1.${filesystem_subnet_domain_name}
@@ -86,6 +123,7 @@ do
    sleep 10
 done ) 
 
+df -h
 
 # Update stripe_size
 beegfs-ctl --setpattern --chunksize=${stripe_size} --numtargets=4 ${mount_point}
