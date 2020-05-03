@@ -31,13 +31,13 @@ variable image_server_hostname_prefix { default = "image-server-" }
 
 # BeeGFS Management (MGS) Server nodes variables
 variable management_server_shape { default = "VM.Standard2.2" }
-variable management_server_node_count { default = 2 }
+variable management_server_node_count { default = 1 }
 variable management_server_disk_count { default = 1 }
 variable management_server_disk_size { default = 50 }
 # Block volume elastic performance tier.  The number of volume performance units (VPUs) that will be applied to this volume per GB, representing the Block Volume service's elastic performance options. See https://docs.cloud.oracle.com/en-us/iaas/Content/Block/Concepts/blockvolumeelasticperformance.htm for more information.  Allowed values are High, Balanced, and Low.  Recommended value is Balanced for balanced performance and High to receive higher performance (IO throughput and IOPS) per GB.
 variable management_server_disk_vpus_per_gb { default = "Balanced" }
 variable management_server_hostname_prefix { default = "mgs-server-" }
-variable management_high_availability { default = true }
+variable management_high_availability { default = false }
 # Has to be within the subnet "fs" CIDR range. Better to use an IP which is closer to the end of the CIDR range. 
 variable management_vip_private_ip { default = "10.0.6.20" }
 
