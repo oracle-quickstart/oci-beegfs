@@ -16,10 +16,6 @@ data "oci_core_subnet" "fs_subnet" {
 subnet_id = var.use_existing_vcn ? var.fs_subnet_id : local.fs_subnet_id
 }
 
-/*
-data "oci_core_subnet" "client_subnet" {
-subnet_id = var.use_existing_vcn ? : local.client_subnet_id
-}
-*/
+
 
 

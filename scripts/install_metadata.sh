@@ -36,10 +36,10 @@ do
     conf_file="${conf_dir}/beegfs-meta.conf"
     mkdir $conf_dir
     cp /etc/beegfs/beegfs-meta.conf "$conf_dir/"
-    /opt/beegfs/sbin/beegfs-setup-meta -c /etc/beegfs/meta${count}.d/beegfs-meta.conf -p /data/mdt${count}/beegfs_meta -s ${id}${count} -S meta${id}-meta${count} -m ${management_server_filesystem_vnic_hostname_prefix}1.${filesystem_subnet_domain_name}
+    /opt/beegfs/sbin/beegfs-setup-meta -c /etc/beegfs/meta${count}.d/beegfs-meta.conf -p /data/mdt${count}/beegfs_meta -s ${id}${count} -S meta${id}-meta${count} -m ${mgmt_host}
   elif [ $disk_cnt -eq 1 ]; then
     conf_file="/etc/beegfs/beegfs-meta.conf"
-    /opt/beegfs/sbin/beegfs-setup-meta -p /data/mdt${count}/beegfs_meta -s $id -m ${management_server_filesystem_vnic_hostname_prefix}1.${filesystem_subnet_domain_name}
+    /opt/beegfs/sbin/beegfs-setup-meta -p /data/mdt${count}/beegfs_meta -s $id -m ${mgmt_host}
   else
     echo "No $disk_type disks"
   fi
@@ -69,7 +69,7 @@ do
 
   systemctl start $service_name
   systemctl status $service_name
-  systemctl enable $service_name
+#  systemctl enable $service_name
   confirm_service_starts
 
 
@@ -108,13 +108,14 @@ EOF
 
 systemctl enable secondnic.service
 systemctl start secondnic.service
-
-# put this in the background so the main script can terminate and continue with the deployment
-while !( systemctl restart secondnic.service )
+vnic_cnt=`/root/secondary_vnic_all_configure.sh | grep "ocid1.vnic." | grep " UP " | wc -l` ; echo $vnic_cnt
+while ( [ $vnic_cnt -le 1 ] )
 do
-   # give the infrastructure another 10 seconds to provide the metadata for the second vnic
-   echo waiting for second NIC to come online
-   sleep 10
+  # give the infrastructure another 10 seconds to provide the metadata for the second vnic
+  echo waiting for second NIC to come online >> $logfile
+  sleep 10
+  systemctl restart secondnic.service
+  vnic_cnt=`/root/secondary_vnic_all_configure.sh | grep "ocid1.vnic." | grep " UP " | wc -l` ; echo $vnic_cnt
 done
 
 }
@@ -131,6 +132,12 @@ sed -i 's|/mnt|/mnt /data|g'  /etc/updatedb.conf
 
 
 wget -O /etc/yum.repos.d/beegfs_rhel7.repo https://www.beegfs.io/release/latest-stable/dists/beegfs-rhel7.repo
+
+if [ "$management_high_availability" = "true" ]; then
+  mgmt_host=${management_vip_private_ip}
+else
+  mgmt_host=${management_server_filesystem_vnic_hostname_prefix}1.${filesystem_subnet_domain_name}
+fi
 
 
 # metadata service; libbeegfs-ib is only required for RDMA

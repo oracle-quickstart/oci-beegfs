@@ -48,7 +48,7 @@ resource "oci_core_vnic_attachment" "metadata_server_secondary_vnic_attachment" 
 
 
 resource "oci_core_vnic_attachment" "management_server_secondary_vnic_attachment" {
-  count = var.management_server_node_count
+  count = local.derived_management_server_node_count
 
   #Required
   create_vnic_details {
@@ -69,4 +69,26 @@ resource "oci_core_vnic_attachment" "management_server_secondary_vnic_attachment
   #nic_index = (local.management_server_dual_nics ? "1" : "0")
   nic_index = (local.management_server_dual_nics ? (local.management_server_hpc_shape ? "0" : "1") : "0")
 
+}
+
+
+resource "oci_core_private_ip" "management_vip_private_ip" {
+    count = var.management_high_availability ? 1 : 0
+    #Required
+    #vnic_id = oci_core_vnic_attachment.management_server_secondary_vnic_attachment[0].vnic_id
+    vnic_id = element(concat(oci_core_vnic_attachment.management_server_secondary_vnic_attachment.*.vnic_id,  [""]), 0)
+
+    #Optional
+    display_name = "mgs-vip"
+    hostname_label = "mgs-vip"
+    ip_address = var.management_vip_private_ip
+}
+
+output "Management-HA-VIP-Private-IP" {
+value = <<END
+
+        mgs-vip: ${var.management_vip_private_ip}
+        mgs-vip: ${element(concat(oci_core_private_ip.management_vip_private_ip.*.ip_address, [""]), 0)}
+
+END
 }

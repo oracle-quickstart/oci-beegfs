@@ -73,21 +73,25 @@ resource "null_resource" "notify_metadata_server_nodes_block_attach_complete" {
 
 
 resource "oci_core_volume" "management_blockvolume" {
-  count               = var.management_server_node_count * var.management_server_disk_count
+  count               = (local.derived_management_server_node_count * var.management_server_disk_count)
   availability_domain = local.ad
   compartment_id      = var.compartment_ocid
-  display_name        = "management${count.index % var.management_server_node_count + 1}-target${count.index % var.management_server_disk_count + 1}"
+  display_name        = "management${count.index % local.derived_management_server_node_count + 1}-target${count.index % var.management_server_disk_count + 1}"
   size_in_gbs         = var.management_server_disk_size
   vpus_per_gb         = var.volume_type_vpus_per_gb_mapping[(var.management_server_disk_vpus_per_gb)]
 }
 
 resource "oci_core_volume_attachment" "management_blockvolume_attach" {
   attachment_type = "iscsi"
-  count           = (var.management_server_node_count * var.management_server_disk_count)
+  count           = (local.derived_management_server_node_count * var.management_server_disk_count)
   instance_id     = element(
     oci_core_instance.management_server.*.id,
-    count.index % var.management_server_node_count,
+    count.index % local.derived_management_server_node_count,
   )
+
+  # Using Linux DRBD feature. So don't need this. As a TODO, test if Multi-attach BVol can provide features equivalent to DRBD?
+  # is_shareable = var.management_high_availability ? true : false
+  device       = var.volume_attach_device_mapping[(0)]
   volume_id        = element(oci_core_volume.management_blockvolume.*.id, count.index)
 
   provisioner "remote-exec" {
@@ -96,7 +100,7 @@ resource "oci_core_volume_attachment" "management_blockvolume_attach" {
       timeout = "30m"
       host    = element(
         oci_core_instance.management_server.*.private_ip,
-        count.index % var.management_server_node_count,
+        count.index % local.derived_management_server_node_count,
       )
       user                = var.ssh_user
       private_key         = tls_private_key.ssh.private_key_pem
@@ -120,7 +124,7 @@ resource "oci_core_volume_attachment" "management_blockvolume_attach" {
 */
 resource "null_resource" "notify_management_server_nodes_block_attach_complete" {
   depends_on = [ oci_core_volume_attachment.management_blockvolume_attach ]
-  count      = var.management_server_node_count
+  count      = local.derived_management_server_node_count
   provisioner "remote-exec" {
     connection {
         agent               = false

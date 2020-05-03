@@ -1,13 +1,73 @@
 set -x
 
+
+function configure_vnics {
+  # Configure second vNIC
+  scriptsource="https://raw.githubusercontent.com/oracle/terraform-examples/master/examples/oci/connect_vcns_using_multiple_vnics/scripts/secondary_vnic_all_configure.sh"
+  vnicscript=/root/secondary_vnic_all_configure.sh
+  curl -s $scriptsource > $vnicscript
+  chmod +x $vnicscript
+  cat > /etc/systemd/system/secondnic.service << EOF
+[Unit]
+Description=Script to configure a secondary vNIC
+
+[Service]
+Type=oneshot
+ExecStart=$vnicscript -c
+ExecStop=$vnicscript -d
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+
+EOF
+
+  systemctl enable secondnic.service
+  systemctl start secondnic.service
+  vnic_cnt=`/root/secondary_vnic_all_configure.sh | grep "ocid1.vnic." | grep " UP " | wc -l` ; echo $vnic_cnt
+  while ( [ $vnic_cnt -le 1 ] )
+  do
+    # give the infrastructure another 10 seconds to provide the metadata for the second vnic
+    echo waiting for second NIC to come online
+    sleep 10
+    systemctl restart secondnic.service
+    vnic_cnt=`/root/secondary_vnic_all_configure.sh | grep "ocid1.vnic." | grep " UP " | wc -l` ; echo $vnic_cnt
+  done
+
+}
+
+
+
+#################
+# Start of script
+#################
+
+
+# call function
+configure_vnics
+
+if [ "$management_high_availability" = "true" ]; then
+  mgmt_host=${management_vip_private_ip}
+  vnicId=`curl -s http://169.254.169.254/opc/v1/vnics/ | jq '.[1].vnicId' | sed 's/"//g' ` ; echo $vnicId
+  /root/secondary_vnic_all_configure.sh -c -e $management_vip_private_ip $vnicId
+else
+  mgmt_host=${management_server_filesystem_vnic_hostname_prefix}1.${filesystem_subnet_domain_name}
+fi
+
+
+
 wget -O /etc/yum.repos.d/beegfs_rhel7.repo https://www.beegfs.io/release/latest-stable/dists/beegfs-rhel7.repo
+
+
+
+
 
 # management service
 yum install beegfs-mgmtd -y
 
 # admon service (optional)
-yum install beegfs-admon -y
-yum install java -y
+# yum install beegfs-admon -y
+# yum install java -y
 
 # Extract value "n" from any hostname like storage-server-n. n>=1
 num=`hostname | gawk -F"." '{ print $1 }' | gawk -F"-"  'NF>1&&$0=$(NF)'`
@@ -63,39 +123,14 @@ if [ $nvme_cnt -eq 0 ]; then
       count=$((count+1))
   done
 
-  fi
+fi
 
-
-  # Configure second vNIC
-  scriptsource="https://raw.githubusercontent.com/oracle/terraform-examples/master/examples/oci/connect_vcns_using_multiple_vnics/scripts/secondary_vnic_all_configure.sh"
-  vnicscript=/root/secondary_vnic_all_configure.sh
-  curl -s $scriptsource > $vnicscript
-  chmod +x $vnicscript
-  cat > /etc/systemd/system/secondnic.service << EOF
-[Unit]
-Description=Script to configure a secondary vNIC
-
-[Service]
-Type=oneshot
-ExecStart=$vnicscript -c
-ExecStop=$vnicscript -d
-RemainAfterExit=yes
-
-[Install]
-WantedBy=multi-user.target
-
-EOF
-
-  systemctl enable secondnic.service
-  systemctl start secondnic.service
-
-  # put this in the background so the main script can terminate and continue with the deployment
-  while !( systemctl restart secondnic.service )
-  do
-    # give the infrastructure another 10 seconds to provide the metadata for the second vnic
-    echo waiting for second NIC to come online >> $logfile
-    sleep 10
-  done
+  # Set this values to make Management NodeID be not dependent on node hostname and thus allow to use the same settings on a different node for HA.
+  # https://www.beegfs.io/wiki/FAQ#force_nodeid
+#echo MGSHA > /data/mgt${count}/beegfs_mgmtd/nodeID
+#  echo 1 > /data/mgt${count}/beegfs_mgmtd/nodeNumID
+# echo MGT1 > /data/mgt${count}/beegfs_mgmtd/targetID
+#  echo 1 > /data/mgt${count}/beegfs_mgmtd/targetNumID
 
 
   # Update beegfs files to use 2nd VNIC only, otherwise nodes will try 1st VNIC and then 2nd. It results in high latency.
@@ -109,13 +144,15 @@ EOF
   cat /etc/beegfs/${type}-connInterfacesFile.conf
 
 
-  # Start services.  They create log files here:  /var/log/beegfs-...
+# Start services.  They create log files here:  /var/log/beegfs-...
+###if [ "$(hostname -s | tail -c 3)" = "-1" ]; then
   systemctl start beegfs-mgmtd ; systemctl status beegfs-mgmtd
-  systemctl enable beegfs-mgmtd
+#  systemctl enable beegfs-mgmtd
+###fi
 
-  cp /etc/beegfs/beegfs-admon.conf /etc/beegfs/beegfs-admon.conf.backup
-  sed -i "s/sysMgmtdHost/sysMgmtdHost=${management_server_filesystem_vnic_hostname_prefix}1.${filesystem_subnet_domain_name}/g" /etc/beegfs/beegfs-admon.conf
+# cp /etc/beegfs/beegfs-admon.conf /etc/beegfs/beegfs-admon.conf.backup
+# sed -i "s/sysMgmtdHost/sysMgmtdHost=${management_server_filesystem_vnic_hostname_prefix}1.${filesystem_subnet_domain_name}/g" /etc/beegfs/beegfs-admon.conf
 
-  systemctl start beegfs-admon
-  systemctl enable beegfs-admon
+#  systemctl start beegfs-admon
+#  systemctl enable beegfs-admon
 

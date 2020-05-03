@@ -3,6 +3,13 @@ set -x
 
 wget -O /etc/yum.repos.d/beegfs_rhel7.repo https://www.beegfs.io/release/latest-stable/dists/beegfs-rhel7.repo
 
+if [ "$management_high_availability" = "true" ]; then
+  mgmt_host=${management_vip_private_ip}
+else
+  mgmt_host=${management_server_filesystem_vnic_hostname_prefix}1.${filesystem_subnet_domain_name}
+fi
+
+
 
 # storage service
 yum install beegfs-storage -y
@@ -26,7 +33,7 @@ if [ "$storage_tier_1_disk_type" = "Local_NVMe_SSD" ]; then
       mkdir -p /data/ost${ost_count}
       mount -t xfs -o noatime,inode64,nobarrier /dev/$disk /data/ost${ost_count}
       mkdir -p /data/ost${ost_count}/beegfs_storage
-      /opt/beegfs/sbin/beegfs-setup-storage -p /data/ost${ost_count}/beegfs_storage -s $id -i ${id}${disk_type}${ost_count} -m ${management_server_filesystem_vnic_hostname_prefix}1.${filesystem_subnet_domain_name}
+      /opt/beegfs/sbin/beegfs-setup-storage -p /data/ost${ost_count}/beegfs_storage -s $id -i ${id}${disk_type}${ost_count} -m ${mgmt_host}
       echo "/dev/$disk  /data/ost${ost_count}   xfs     defaults,_netdev,noatime,inode64        0 0" >> /etc/fstab
       count=$((count+1))
       ost_count=$((ost_count+1))
@@ -95,7 +102,7 @@ do
     mkdir -p /data/ost${ost_count}
     mount -t xfs -o noatime,inode64,nobarrier /dev/$disk /data/ost${ost_count}
     mkdir -p /data/ost${ost_count}/beegfs_storage
-    /opt/beegfs/sbin/beegfs-setup-storage -p /data/ost${ost_count}/beegfs_storage -s $id -i ${id}${disk_type}${ost_count} -m ${management_server_filesystem_vnic_hostname_prefix}1.${filesystem_subnet_domain_name}
+    /opt/beegfs/sbin/beegfs-setup-storage -p /data/ost${ost_count}/beegfs_storage -s $id -i ${id}${disk_type}${ost_count} -m ${mgmt_host}
     echo "/dev/$disk  /data/ost${ost_count}   xfs     defaults,_netdev,noatime,inode64        0 0" >> /etc/fstab
     count=$((count+1))
     ost_count=$((ost_count+1))
@@ -126,14 +133,16 @@ EOF
 
 systemctl enable secondnic.service
 systemctl start secondnic.service
-
-# put this in the background so the main script can terminate and continue with the deployment
-while !( systemctl restart secondnic.service )
+vnic_cnt=`/root/secondary_vnic_all_configure.sh | grep "ocid1.vnic." | grep " UP " | wc -l` ; echo $vnic_cnt
+while ( [ $vnic_cnt -le 1 ] )
 do
-   # give the infrastructure another 10 seconds to provide the metadata for the second vnic
-   echo waiting for second NIC to come online
-   sleep 10
+  # give the infrastructure another 10 seconds to provide the metadata for the second vnic
+  echo waiting for second NIC to come online >> $logfile
+  sleep 10
+  systemctl restart secondnic.service
+  vnic_cnt=`/root/secondary_vnic_all_configure.sh | grep "ocid1.vnic." | grep " UP " | wc -l` ; echo $vnic_cnt
 done
+
 
 sed -i 's/connMaxInternodeNum.*= 12/connMaxInternodeNum          = 24/g'  /etc/beegfs/beegfs-storage.conf
 sed -i 's/storeAllowFirstRunInit.*= false/storeAllowFirstRunInit       = true/g'  /etc/beegfs/beegfs-storage.conf
@@ -150,7 +159,7 @@ cat /etc/beegfs/${type}-connInterfacesFile.conf
 
 # Start services.  They create log files here:  /var/log/beegfs-...
 systemctl start beegfs-storage ; systemctl status beegfs-storage
-systemctl enable beegfs-storage
+# systemctl enable beegfs-storage
 
 
 # Retry until successful. It retries until all dependent server nodes and their services/deamons are up and ready to connect

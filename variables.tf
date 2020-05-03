@@ -3,6 +3,20 @@
 ## Defines variables and local values
 ###
 
+# Generate a new strong password for hacluster user
+resource "random_string" "hacluster_user_password" {
+  length     = 16
+  special    = true
+  upper      = true
+  min_upper  = 2
+  number     = true
+  min_number = 2
+}
+
+output "hacluster_user_password" {
+  value = ["${random_string.hacluster_user_password.result}"]
+}
+
 variable "vpc_cidr" { default = "10.0.0.0/16" }
 
 
@@ -10,23 +24,28 @@ variable bastion_shape { default = "VM.Standard2.2" }
 variable bastion_node_count { default = 1 }
 variable bastion_hostname_prefix { default = "bastion-" }
 
+variable image_server_shape { default = "VM.Standard2.2" }
+variable image_server_node_count { default = 0 }
+variable image_server_hostname_prefix { default = "image-server-" }
+
 
 # BeeGFS Management (MGS) Server nodes variables
 variable management_server_shape { default = "VM.Standard2.2" }
-variable management_server_node_count { default = 1 }
+variable management_server_node_count { default = 2 }
 variable management_server_disk_count { default = 1 }
 variable management_server_disk_size { default = 50 }
 # Block volume elastic performance tier.  The number of volume performance units (VPUs) that will be applied to this volume per GB, representing the Block Volume service's elastic performance options. See https://docs.cloud.oracle.com/en-us/iaas/Content/Block/Concepts/blockvolumeelasticperformance.htm for more information.  Allowed values are High, Balanced, and Low.  Recommended value is Balanced for balanced performance and High to receive higher performance (IO throughput and IOPS) per GB.
 variable management_server_disk_vpus_per_gb { default = "Balanced" }
 variable management_server_hostname_prefix { default = "mgs-server-" }
-
-
+variable management_high_availability { default = true }
+# Has to be within the subnet "fs" CIDR range. Better to use an IP which is closer to the end of the CIDR range. 
+variable management_vip_private_ip { default = "10.0.6.20" }
 
 # BeeGFS Metadata (MDS) Server nodes variables  #VM.Standard2.8
 variable metadata_server_shape { default = "VM.Standard2.2" }
 variable metadata_server_node_count { default = 1 }
 # if disk_count > 1, then it create multiple MDS instance, each with 1 disk as MDT for optimal performance. If node has both local nvme ssd and block storage, block storage volumes will be ignored.
-variable metadata_server_disk_count { default = 2 }
+variable metadata_server_disk_count { default = 1 }
 # 500
 variable metadata_server_disk_size { default = 50 }
 # Block volume elastic performance tier.  The number of volume performance units (VPUs) that will be applied to this volume per GB, representing the Block Volume service's elastic performance options. See https://docs.cloud.oracle.com/en-us/iaas/Content/Block/Concepts/blockvolumeelasticperformance.htm for more information.  Allowed values are High, Balanced, and Low.  Recommended value is Balanced for balanced performance and High to receive higher performance (IO throughput and IOPS) per GB.
@@ -34,10 +53,9 @@ variable metadata_server_disk_vpus_per_gb { default = "High" }
 variable metadata_server_hostname_prefix { default = "metadata-server-" }
 
 
-
 # BeeGFS Stoarage/Object (OSS) Server nodes variables BM.Standard2.52
 variable storage_server_shape { default = "VM.Standard2.2" }
-variable storage_server_node_count { default = 2 }
+variable storage_server_node_count { default = 1 }
 variable storage_server_hostname_prefix { default = "storage-server-" }
 
 # Client nodes variables VM.Standard2.24
@@ -144,12 +162,14 @@ variable "ssh_user" { default = "opc" }
 
 
 locals {
-  management_server_dual_nics = (length(regexall("^BM", var.management_server_shape)) > 0 ? true : false)
-  management_server_hpc_shape = (length(regexall("HPC2", var.management_server_shape)) > 0 ? true : false)
-  metadata_server_dual_nics = (length(regexall("^BM", var.metadata_server_shape)) > 0 ? true : false)
-  metadata_server_hpc_shape = (length(regexall("HPC2", var.metadata_server_shape)) > 0 ? true : false)
-  storage_server_dual_nics = (length(regexall("^BM", var.storage_server_shape)) > 0 ? true : false)
-  storage_server_hpc_shape = (length(regexall("HPC2", var.storage_server_shape)) > 0 ? true : false)
+  # hard coding the default to 1, instead of using var.management_server_node_count, incase user sets it to 2, then logic will fail.
+  derived_management_server_node_count = var.management_high_availability ? 2 : 1
+  management_server_dual_nics  = (length(regexall("^BM", var.management_server_shape)) > 0 ? true : false)
+  management_server_hpc_shape  = (length(regexall("HPC2", var.management_server_shape)) > 0 ? true : false)
+  metadata_server_dual_nics    = (length(regexall("^BM", var.metadata_server_shape)) > 0 ? true : false)
+  metadata_server_hpc_shape    = (length(regexall("HPC2", var.metadata_server_shape)) > 0 ? true : false)
+  storage_server_dual_nics     = (length(regexall("^BM", var.storage_server_shape)) > 0 ? true : false)
+  storage_server_hpc_shape     = (length(regexall("HPC2", var.storage_server_shape)) > 0 ? true : false)
 
   storage_subnet_domain_name=("${data.oci_core_subnet.storage_subnet.dns_label}.${data.oci_core_vcn.beegfs.dns_label}.oraclevcn.com" )
   filesystem_subnet_domain_name=( "${data.oci_core_subnet.fs_subnet.dns_label}.${data.oci_core_vcn.beegfs.dns_label}.oraclevcn.com" )
@@ -163,7 +183,6 @@ locals {
   # Allows for use of ad_number in TF deploys, and ad_name in ORM.
   # Use of max() prevents out of index lookup call.
   ad = "${var.ad_number >= 0 ? lookup(data.oci_identity_availability_domains.availability_domains.availability_domains[max(0,var.ad_number)],"name") : var.ad_name}"
-
 }
 
 

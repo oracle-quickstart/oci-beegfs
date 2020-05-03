@@ -60,6 +60,12 @@ fi
 
 wget -O /etc/yum.repos.d/beegfs_rhel7.repo https://www.beegfs.io/release/latest-stable/dists/beegfs-rhel7.repo
 
+if [ "$management_high_availability" = "true" ]; then
+  mgmt_host=${management_vip_private_ip}
+else
+  mgmt_host=${management_server_filesystem_vnic_hostname_prefix}1.${filesystem_subnet_domain_name}
+fi
+
 
 # client and command-line utils
 yum install beegfs-client beegfs-helperd beegfs-utils -y
@@ -84,7 +90,7 @@ fi
 
 
 # client setup
-/opt/beegfs/sbin/beegfs-setup-client -m ${management_server_filesystem_vnic_hostname_prefix}1.${filesystem_subnet_domain_name}
+/opt/beegfs/sbin/beegfs-setup-client -m ${mgmt_host}
 
 # Update client mount config to use custom mount point. /mnt/beegfs
 sed -i "s|/mnt/beegfs|${mount_point}|g"  /etc/beegfs/beegfs-mounts.conf
@@ -113,7 +119,7 @@ systemctl start beegfs-helperd ; systemctl status beegfs-helperd
 systemctl start beegfs-client ; systemctl status beegfs-client
 
 systemctl enable beegfs-helperd
-systemctl enable beegfs-client
+# systemctl enable beegfs-client
 
 # Retry until successful. It retries until all dependent server nodes and their services/deamons are up and ready for clients to connect and mount file system
 ( while !( systemctl restart beegfs-client )
@@ -128,6 +134,6 @@ df -h
 # Update stripe_size
 beegfs-ctl --setpattern --chunksize=${stripe_size} --numtargets=4 ${mount_point}
 
-
 # post deployment, optional scripts like ior_install.sh will only run if below file exist. 
 touch /tmp/mount.complete
+
