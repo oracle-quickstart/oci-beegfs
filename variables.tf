@@ -3,47 +3,33 @@
 ## Defines variables and local values
 ###
 
-# Generate a new strong password for hacluster user
-resource "random_string" "hacluster_user_password" {
-  length     = 16
-  special    = true
-  upper      = true
-  min_upper  = 2
-  number     = true
-  min_number = 2
-}
 
-output "hacluster_user_password" {
-  value = ["${random_string.hacluster_user_password.result}"]
-}
 
-variable "vpc_cidr" { default = "10.0.0.0/16" }
+
+# 172.28.0.0/16   10.0.0.0/16
+variable "vpc_cidr" { default = "172.28.0.0/16" }
 
 
 variable bastion_shape { default = "VM.Standard2.2" }
 variable bastion_node_count { default = 1 }
 variable bastion_hostname_prefix { default = "bastion-" }
 
-variable image_server_shape { default = "VM.Standard2.2" }
-variable image_server_node_count { default = 0 }
-variable image_server_hostname_prefix { default = "image-server-" }
-
-
 # BeeGFS Management (MGS) Server nodes variables
 variable management_server_shape { default = "VM.Standard2.2" }
-variable management_server_node_count { default = 1 }
+variable management_server_node_count { default = 2 }
 variable management_server_disk_count { default = 1 }
 variable management_server_disk_size { default = 50 }
 # Block volume elastic performance tier.  The number of volume performance units (VPUs) that will be applied to this volume per GB, representing the Block Volume service's elastic performance options. See https://docs.cloud.oracle.com/en-us/iaas/Content/Block/Concepts/blockvolumeelasticperformance.htm for more information.  Allowed values are High, Balanced, and Low.  Recommended value is Balanced for balanced performance and High to receive higher performance (IO throughput and IOPS) per GB.
 variable management_server_disk_vpus_per_gb { default = "Balanced" }
 variable management_server_hostname_prefix { default = "mgs-server-" }
-variable management_high_availability { default = false }
+variable management_high_availability { default = true }
 # Has to be within the subnet "fs" CIDR range. Better to use an IP which is closer to the end of the CIDR range. 
-variable management_vip_private_ip { default = "10.0.6.20" }
+variable management_vip_private_ip { default = "172.28.6.210" }
+
 
 # BeeGFS Metadata (MDS) Server nodes variables  #VM.Standard2.8
 variable metadata_server_shape { default = "VM.Standard2.2" }
-variable metadata_server_node_count { default = 1 }
+variable metadata_server_node_count { default = 2 }
 # if disk_count > 1, then it create multiple MDS instance, each with 1 disk as MDT for optimal performance. If node has both local nvme ssd and block storage, block storage volumes will be ignored.
 variable metadata_server_disk_count { default = 1 }
 # 500
@@ -51,15 +37,20 @@ variable metadata_server_disk_size { default = 50 }
 # Block volume elastic performance tier.  The number of volume performance units (VPUs) that will be applied to this volume per GB, representing the Block Volume service's elastic performance options. See https://docs.cloud.oracle.com/en-us/iaas/Content/Block/Concepts/blockvolumeelasticperformance.htm for more information.  Allowed values are High, Balanced, and Low.  Recommended value is Balanced for balanced performance and High to receive higher performance (IO throughput and IOPS) per GB.
 variable metadata_server_disk_vpus_per_gb { default = "High" }
 variable metadata_server_hostname_prefix { default = "metadata-server-" }
+variable metadata_high_availability { default = true }
+# Has to be within the subnet "fs" CIDR range. Better to use an IP which is closer to the end of the CIDR range.
+variable metadata_vip_private_ip { default = "172.28.6.211" }
+# set to true if you want to use OCI Block Volume with Multi-attach feature (SAN like storage) instead of DRBD for replication for HA solution.
+variable metadata_use_shared_disk { default = true }
 
 
 # BeeGFS Stoarage/Object (OSS) Server nodes variables BM.Standard2.52
 variable storage_server_shape { default = "VM.Standard2.2" }
-variable storage_server_node_count { default = 1 }
+variable storage_server_node_count { default = 2 }
 variable storage_server_hostname_prefix { default = "storage-server-" }
 
-# Client nodes variables VM.Standard2.24
-variable client_node_shape { default = "VM.Standard2.2" }
+# Client nodes variables VM.Standard2.24, VM.Standard2.2
+variable client_node_shape { default = "BM.HPC2.36" }
 variable client_node_count { default = 1 }
 variable client_node_hostname_prefix { default = "client-" }
 
@@ -79,7 +70,7 @@ variable "ad_number" {
 
 
 variable "storage_tier_1_disk_type" {
-  default = "High"
+  default = "Balanced"
   description = "Use Local_NVMe_SSD value only if DenseIO shape was selected for Storage server. Otherwise select block volume storage types (high, balanced, low) based on your performance needs. Valid values are Local_NVMe_SSD, High, Balanced, Low."
 }
 
@@ -164,13 +155,16 @@ variable "ssh_user" { default = "opc" }
 locals {
   # hard coding the default to 1, instead of using var.management_server_node_count, incase user sets it to 2, then logic will fail.
   derived_management_server_node_count = var.management_high_availability ? 2 : 1
+#derived_metadata_server_node_count = var.metadata_high_availability ? 2 : 1
+derived_metadata_server_node_count = var.metadata_high_availability ? ((var.metadata_server_node_count > 1 && var.metadata_server_node_count % 2 == 0) ? var.metadata_server_node_count : "Should be multiplier of 2 for high availabilty" ) : var.metadata_server_node_count
+
   management_server_dual_nics  = (length(regexall("^BM", var.management_server_shape)) > 0 ? true : false)
   management_server_hpc_shape  = (length(regexall("HPC2", var.management_server_shape)) > 0 ? true : false)
   metadata_server_dual_nics    = (length(regexall("^BM", var.metadata_server_shape)) > 0 ? true : false)
   metadata_server_hpc_shape    = (length(regexall("HPC2", var.metadata_server_shape)) > 0 ? true : false)
   storage_server_dual_nics     = (length(regexall("^BM", var.storage_server_shape)) > 0 ? true : false)
   storage_server_hpc_shape     = (length(regexall("HPC2", var.storage_server_shape)) > 0 ? true : false)
-
+  client_hpc_shape             = (length(regexall("HPC2", var.client_node_shape)) > 0 ? true : false)
   storage_subnet_domain_name=("${data.oci_core_subnet.storage_subnet.dns_label}.${data.oci_core_vcn.beegfs.dns_label}.oraclevcn.com" )
   filesystem_subnet_domain_name=( "${data.oci_core_subnet.fs_subnet.dns_label}.${data.oci_core_vcn.beegfs.dns_label}.oraclevcn.com" )
   vcn_domain_name=("${data.oci_core_vcn.beegfs.dns_label}.oraclevcn.com" )
@@ -186,7 +180,7 @@ locals {
 }
 
 
-variable "images" {
+variable "imagesCentos" {
   type = map(string)
   default = {
     // https://docs.cloud.oracle.com/iaas/images/image/96ad11d8-2a4f-4154-b128-4d4510756983/
@@ -202,9 +196,8 @@ variable "images" {
 // See https://docs.cloud.oracle.com/en-us/iaas/images/image/0a72692a-bdbb-46fc-b17b-6e0a3fedeb23/
 // Oracle-provided image "Oracle-Linux-7.7-2020.01.28-0"
 // Kernel Version: 4.14.35-1902.10.4.el7uek.x86_64
-/*
-variable "imagesOL" {
-  type = "map"
+variable "images" {
+  type = map(string)
   default = {
     ap-melbourne-1 = "ocid1.image.oc1.ap-melbourne-1.aaaaaaaa3fvafraincszwi36zv2oeangeitnnj7svuqjbm2agz3zxhzozadq"
     ap-mumbai-1 = "ocid1.image.oc1.ap-mumbai-1.aaaaaaaabyd7swhvmsttpeejgksgx3faosizrfyeypdmqdghgn7wzed26l3q"
@@ -226,7 +219,7 @@ variable "imagesOL" {
     us-phoenix-1 = "ocid1.image.oc1.phx.aaaaaaaamff6sipozlita6555ypo5uyqo2udhjqwtrml2trogi6vnpgvet5q"
   }
 }
-*/
+
 
 
 # Not used for normal terraform apply, added for ORM deployments.
@@ -285,6 +278,23 @@ variable "volume_type_vpus_per_gb_mapping" {
 }
 
 
+# Generate a new strong password for hacluster user
+resource "random_string" "hacluster_user_password" {
+  length      = 16
+  special     = true
+  upper       = true
+  min_upper   = 2
+  number      = true
+  min_numeric = 2
+}
+
+output "hacluster_user_password" {
+  value = ["${random_string.hacluster_user_password.result}"]
+}
+
+
+
+
 #-------------------------------------------------------------------------------------------------------------
 # Marketplace variables
 # hpc-filesystem-BeeGFS-OL77_3.10.0-1062.9.1.el7.x86_64
@@ -307,23 +317,72 @@ variable "use_marketplace_image" {
 # ------------------------------------------------------------------------------------------------------------
 
 
+#-------------------------------------------------------------------------------------------------------------
+# Marketplace variables for Management Server High Availability setup
+# Artifact - High_Availability_DRBD_Pacemaker_Corosync_OL77_3.10.0-1062.9.1.el7
+# ------------------------------------------------------------------------------------------------------------
+
+variable "ha_mp_listing_id" {
+default = "ocid1.appcataloglisting.oc1..aaaaaaaayhsvdenfgrpw6jich4o6t2gtgfrudyfgih5i7z2dmjfqowalmerq"
+}
+variable "ha_mp_listing_resource_id" {
+default = "ocid1.image.oc1..aaaaaaaanvvgvh3237ggcsxpzbielgrixuepfbylohfn6752nohhlzgmkzsa"
+}
+variable "ha_mp_listing_resource_version" {
+default = "1.0_03052020"
+}
+
+/*
+variable "use_marketplace_image" {
+default = true
+}
+*/
+# ------------------------------------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------------------------------------
+# Marketplace variables for HPC Client/Compute Node
+# Artifact - HPC CN Image - https://github.com/oci-hpc/oci-hpc-clusternetwork/blob/6c72b18736f076b169bf14780add58387156bc77/util.tf
+# ------------------------------------------------------------------------------------------------------------
+
+variable "hpc_cn_mp_listing_id" {
+default = "ocid1.appcataloglisting.oc1..aaaaaaaahz2xiwfcsbebmqg7sp6lhdt6r2vsjro5jfukkl5cntlqvfhkbzaq"
+}
+variable "hpc_cn_mp_listing_resource_id" {
+default = "ocid1.image.oc1..aaaaaaaafgzcla4pkskkegec3okzhbtmaylnldbxoa4ln7d6npytnqwu3mca"
+}
+variable "hpc_cn_mp_listing_resource_version" {
+default = "20190906"
+}
+
+# ------------------------------------------------------------------------------------------------------------
+
+
+
+
 variable "use_existing_vcn" {
   default = "false"
 }
 
 variable "vcn_id" {
-  default = ""
+  default = "ocid1.vcn.oc1.ap-osaka-1.amaaaaaa7rhxvoaaexoygwttphgshtv4li6aoseag7jq7f5qpr5tvyrzfpha"
 }
 
 variable "bastion_subnet_id" {
-  default = ""
+  default = "ocid1.subnet.oc1.ap-osaka-1.aaaaaaaazfhespkc4oorh55cluresxbqica4hxv2u7tmwnnuc35pfkarhuca"
 }
 
 variable "storage_subnet_id" {
-  default = ""
+  default = "ocid1.subnet.oc1.ap-osaka-1.aaaaaaaa7b3yeiy6cfalnfsvil4ln27eow7v3qzczw2kvs3q4scetehaukya"
 }
 
 variable "fs_subnet_id" {
-  default = ""
+  default = "ocid1.subnet.oc1.ap-osaka-1.aaaaaaaae42bf6ihqlhvtb3pamdgvy6yno4vcqlqbus3pb3wxrai4k4yyzfa"
 }
 
+
+
+#############
+##  THIS IS TO BE USED TO CREATE A NEW IMAGE with HA packages like DRBD, Pacemaker, Corosync.  For normal BeeGFS operation, this is not needed. Please do not change these values.
+############
+variable image_server_shape { default = "VM.Standard2.2" }
+variable image_server_node_count { default = 0 }
+variable image_server_hostname_prefix { default = "image-server-" }

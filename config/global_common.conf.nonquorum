@@ -4,8 +4,6 @@ global {
 common {
     protocol C;
     options {
-        quorum majority;
         auto-promote no;
     }
 }
-

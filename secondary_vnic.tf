@@ -23,7 +23,8 @@ resource "oci_core_vnic_attachment" "storage_server_secondary_vnic_attachment" {
 }
 
 resource "oci_core_vnic_attachment" "metadata_server_secondary_vnic_attachment" {
-  count = var.metadata_server_node_count
+#count = var.metadata_server_node_count
+  count = local.derived_metadata_server_node_count
 
   #Required
   create_vnic_details {
@@ -44,6 +45,27 @@ resource "oci_core_vnic_attachment" "metadata_server_secondary_vnic_attachment" 
   #nic_index = (local.metadata_server_dual_nics ? "1" : "0")
   nic_index = (local.metadata_server_dual_nics ? (local.metadata_server_hpc_shape ? "0" : "1") : "0")
 
+}
+
+resource "oci_core_private_ip" "metadata_vip_private_ip" {
+    count = var.metadata_high_availability ? 1 : 0
+    #Required
+    #vnic_id = oci_core_vnic_attachment.metadata_server_secondary_vnic_attachment[0].vnic_id
+    vnic_id = element(concat(oci_core_vnic_attachment.metadata_server_secondary_vnic_attachment.*.vnic_id,  [""]), 0)
+
+    #Optional
+    display_name = "mds-vip"
+    hostname_label = "mds-vip"
+    ip_address = var.metadata_vip_private_ip
+}
+
+output "Metadata-HA-VIP-Private-IP" {
+value = <<END
+
+        mds-vip: ${var.metadata_vip_private_ip}
+        mds-vip: ${element(concat(oci_core_private_ip.metadata_vip_private_ip.*.ip_address, [""]), 0)}
+
+END
 }
 
 
@@ -92,3 +114,4 @@ value = <<END
 
 END
 }
+

@@ -8,6 +8,11 @@ locals {
   fs_subnet_id      = var.use_existing_vcn ? var.fs_subnet_id : element(concat(oci_core_subnet.fs.*.id, [""]), 0)
   client_subnet_id  = var.use_existing_vcn ? var.fs_subnet_id : element(concat(oci_core_subnet.fs.*.id, [""]), 0)
   image_id          = (var.use_marketplace_image ? var.mp_listing_resource_id : var.images[var.region])
+#  management_image_id = var.management_high_availability ? "ocid1.image.oc1.iad.aaaaaaaa4sdqnx63m74c6v24ch4wqrxy5duvhlzsms47fj2lxuianzc62wma" : local.image_id
+# metadata_image_id = var.metadata_high_availability ? "ocid1.image.oc1.iad.aaaaaaaa4sdqnx63m74c6v24ch4wqrxy5duvhlzsms47fj2lxuianzc62wma" : local.image_id
+management_image_id = var.management_high_availability ? var.ha_mp_listing_resource_id : local.image_id
+metadata_image_id = var.metadata_high_availability ? var.ha_mp_listing_resource_id : local.image_id
+client_image_id = local.client_hpc_shape ? var.hpc_cn_mp_listing_resource_id : local.image_id
 }
 
 
@@ -65,7 +70,8 @@ resource "oci_core_instance" "management_server" {
   source_details {
     source_type       = "image"
     # Image with DRBD compiled for OL7.7 kernel and PCS, Corosync, Pacemaker install
-    source_id         = "ocid1.image.oc1.iad.aaaaaaaa4sdqnx63m74c6v24ch4wqrxy5duvhlzsms47fj2lxuianzc62wma"
+    source_id         = local.management_image_id
+    # "ocid1.image.oc1.iad.aaaaaaaa4sdqnx63m74c6v24ch4wqrxy5duvhlzsms47fj2lxuianzc62wma"
     # local.image_id
   }
 
@@ -95,10 +101,12 @@ resource "oci_core_instance" "management_server" {
         "management_high_availability=\"${var.management_high_availability}\"",
         "management_vip_private_ip=\"${var.management_vip_private_ip}\"",
         "hacluster_user_password=\"${random_string.hacluster_user_password.result}\"",
+        "quorum_hostname=\"drbd-quorum-1\"",
         file("${var.scripts_directory}/firewall.sh"),
         file("${var.scripts_directory}/update_resolv_conf.sh"),
+        file("${var.scripts_directory}/configure_vnics.sh"),
         file("${var.scripts_directory}/install_ha_w_image.sh"),
-#        file("${var.scripts_directory}/install_management.sh")
+        file("${var.scripts_directory}/install_management.sh")
       )))}"
     }
 
@@ -163,9 +171,10 @@ resource "null_resource" "move_HA_config_files" {
 
 
 resource "oci_core_instance" "metadata_server" {
-  count               = var.metadata_server_node_count
+  count               = local.derived_metadata_server_node_count
+  # var.metadata_server_node_count
   availability_domain = local.ad
-  #fault_domain        = "FAULT-DOMAIN-${(count.index%3)+1}"
+  fault_domain        = "FAULT-DOMAIN-${(count.index%3)+1}"
   compartment_id      = var.compartment_ocid
   display_name        = "${var.metadata_server_hostname_prefix}${format("%01d", count.index+1)}"
   hostname_label      = "${var.metadata_server_hostname_prefix}${format("%01d", count.index+1)}"
@@ -174,7 +183,9 @@ resource "oci_core_instance" "metadata_server" {
 
   source_details {
     source_type = "image"
-    source_id   = local.image_id
+    #source_id   = local.image_id
+    source_id         = local.metadata_image_id
+
   }
 
   launch_options {
@@ -203,9 +214,16 @@ resource "oci_core_instance" "metadata_server" {
         "vcn_domain_name=\"${local.vcn_domain_name}\"",
         "management_high_availability=\"${var.management_high_availability}\"",
         "management_vip_private_ip=\"${var.management_vip_private_ip}\"",
-        file("${var.scripts_directory}/firewall.sh"),
-        file("${var.scripts_directory}/update_resolv_conf.sh"),
-        file("${var.scripts_directory}/install_metadata.sh"),
+"metadata_high_availability=\"${var.metadata_high_availability}\"",
+"metadata_vip_private_ip=\"${var.metadata_vip_private_ip}\"",
+"hacluster_user_password=\"${random_string.hacluster_user_password.result}\"",
+"metadata_use_shared_disk=\"${var.metadata_use_shared_disk}\"",
+file("${var.scripts_directory}/firewall.sh"),
+file("${var.scripts_directory}/update_resolv_conf.sh"),
+file("${var.scripts_directory}/configure_vnics.sh"),
+(var.metadata_high_availability ? file("${var.scripts_directory}/install_mds_ha_w_image.sh") : ""),
+(var.metadata_high_availability ? "" : file("${var.scripts_directory}/install_metadata.sh")),
+#        file("${var.scripts_directory}/install_metadata.sh"),
         file("${var.scripts_directory}/metadata_tuning.sh")
       )))}"
     }
@@ -216,12 +234,65 @@ resource "oci_core_instance" "metadata_server" {
 
 }
 
+resource "null_resource" "move_MDS_HA_config_files" {
+  depends_on = [ oci_core_instance.metadata_server ]
+  count      = local.derived_metadata_server_node_count
+  provisioner "file" {
+    content     = tls_private_key.ssh.private_key_pem
+    destination = "/home/opc/.ssh/id_rsa"
+    connection {
+        agent               = false
+        timeout             = "30m"
+        host                = element(oci_core_instance.metadata_server.*.private_ip, count.index)
+        user                = var.ssh_user
+        private_key         = tls_private_key.ssh.private_key_pem
+        bastion_host        = oci_core_instance.bastion.*.public_ip[0]
+        bastion_port        = "22"
+        bastion_user        = var.ssh_user
+        bastion_private_key = tls_private_key.ssh.private_key_pem
+    }
+  }
+
+  provisioner "remote-exec" {
+    inline = [
+      "chmod 600 /home/opc/.ssh/id_rsa",
+    ]
+    connection {
+        agent               = false
+        timeout             = "30m"
+        host                = element(oci_core_instance.metadata_server.*.private_ip, count.index)
+        user                = var.ssh_user
+        private_key         = tls_private_key.ssh.private_key_pem
+        bastion_host        = oci_core_instance.bastion.*.public_ip[0]
+        bastion_port        = "22"
+        bastion_user        = var.ssh_user
+        bastion_private_key = tls_private_key.ssh.private_key_pem
+    }
+  }
+
+  provisioner "file" {
+    source        = "config"
+    destination   = "/home/opc/"
+    connection {
+        agent               = false
+        timeout             = "30m"
+        host                = element(oci_core_instance.metadata_server.*.private_ip, count.index)
+        user                = var.ssh_user
+        private_key         = tls_private_key.ssh.private_key_pem
+        bastion_host        = oci_core_instance.bastion.*.public_ip[0]
+        bastion_port        = "22"
+        bastion_user        = var.ssh_user
+        bastion_private_key = tls_private_key.ssh.private_key_pem
+    }
+  }
+
+}
 
 
 resource "oci_core_instance" "storage_server" {
   count               = var.storage_server_node_count
   availability_domain = local.ad
-  #fault_domain        = "FAULT-DOMAIN-${(count.index%3)+1}"
+  fault_domain        = "FAULT-DOMAIN-${(count.index%3)+1}"
   compartment_id      = var.compartment_ocid
   display_name        = "${var.storage_server_hostname_prefix}${format("%01d", count.index+1)}"
   hostname_label      = "${var.storage_server_hostname_prefix}${format("%01d", count.index+1)}"
@@ -295,7 +366,8 @@ resource "oci_core_instance" "client_node" {
 
   source_details {
     source_type = "image"
-    source_id   = local.image_id
+    source_id   = local.client_image_id
+    #local.image_id
   }
 
   launch_options {

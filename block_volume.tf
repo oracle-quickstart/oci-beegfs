@@ -5,22 +5,27 @@ The Universal Permissive License (UPL), Version 1.0
 */
 
 resource "oci_core_volume" "metadata_blockvolume" {
-  count               = var.metadata_server_node_count * var.metadata_server_disk_count
+#count               = var.metadata_server_node_count * var.metadata_server_disk_count
+#count               = (local.derived_metadata_server_node_count * var.metadata_server_disk_count)
+count               =  (var.metadata_use_shared_disk ? ((local.derived_metadata_server_node_count / 2)*var.metadata_server_disk_count)  : (local.derived_metadata_server_node_count * var.metadata_server_disk_count) )
+
   availability_domain = local.ad
   compartment_id      = var.compartment_ocid
-  display_name        = "metadata${count.index % var.metadata_server_node_count + 1}-target${count.index % var.metadata_server_disk_count + 1}"
+#display_name        = "metadata${count.index % var.metadata_server_node_count + 1}-target${count.index % var.metadata_server_disk_count + 1}"
+display_name        = "metadata${count.index % local.derived_metadata_server_node_count + 1}-target${count.index % var.metadata_server_disk_count + 1}"
   size_in_gbs         = var.metadata_server_disk_size
   vpus_per_gb         = var.volume_type_vpus_per_gb_mapping[(var.metadata_server_disk_vpus_per_gb)]
 }
 
 resource "oci_core_volume_attachment" "metadata_blockvolume_attach" {
   attachment_type = "iscsi"
-  count = (var.metadata_server_node_count * var.metadata_server_disk_count)
-  instance_id = element(
-    oci_core_instance.metadata_server.*.id,
-    count.index % var.metadata_server_node_count,
-  )
-  volume_id = element(oci_core_volume.metadata_blockvolume.*.id, count.index)
+#count = (var.metadata_server_node_count * var.metadata_server_disk_count)
+count           = (local.derived_metadata_server_node_count * var.metadata_server_disk_count)
+#instance_id = element(oci_core_instance.metadata_server.*.id, count.index % var.metadata_server_node_count,)
+  instance_id = element(oci_core_instance.metadata_server.*.id, (var.metadata_use_shared_disk ? ((count.index % 2) + (floor(count.index/(var.metadata_server_disk_count*2))*2))   : count.index % local.derived_metadata_server_node_count),)
+  volume_id = element(oci_core_volume.metadata_blockvolume.*.id, (var.metadata_use_shared_disk ? floor(count.index/2) : count.index))
+  is_shareable = var.metadata_use_shared_disk ? true : false
+device       = var.volume_attach_device_mapping[(count.index % var.metadata_server_disk_count)]
 
   provisioner "remote-exec" {
     connection {
@@ -28,8 +33,11 @@ resource "oci_core_volume_attachment" "metadata_blockvolume_attach" {
       timeout = "30m"
       host    = element(
         oci_core_instance.metadata_server.*.private_ip,
-        count.index % var.metadata_server_node_count,
+        #count.index % var.metadata_server_node_count,
+        #count.index % local.derived_metadata_server_node_count,
+        (var.metadata_use_shared_disk ? ((count.index % 2) + (floor(count.index/(var.metadata_server_disk_count*2))*2))   : count.index % local.derived_metadata_server_node_count)
       )
+
       user                = var.ssh_user
       private_key         = tls_private_key.ssh.private_key_pem
       bastion_host        = oci_core_instance.bastion[0].public_ip
@@ -51,7 +59,8 @@ resource "oci_core_volume_attachment" "metadata_blockvolume_attach" {
 */
 resource "null_resource" "notify_metadata_server_nodes_block_attach_complete" {
   depends_on = [ oci_core_volume_attachment.metadata_blockvolume_attach ]
-  count      = var.metadata_server_node_count
+#count      = var.metadata_server_node_count
+  count      = local.derived_metadata_server_node_count
   provisioner "remote-exec" {
     connection {
         agent               = false
