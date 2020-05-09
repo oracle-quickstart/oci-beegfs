@@ -159,8 +159,8 @@ cat /etc/beegfs/${type}-connInterfacesFile.conf
 
 # Start services.  They create log files here:  /var/log/beegfs-...
 systemctl start beegfs-storage ; systemctl status beegfs-storage
-# systemctl enable beegfs-storage
-
+systemctl disable beegfs-storage
+systemctl list-unit-files | grep beegfs
 
 # Retry until successful. It retries until all dependent server nodes and their services/deamons are up and ready to connect
 ( while !( systemctl restart beegfs-storage )

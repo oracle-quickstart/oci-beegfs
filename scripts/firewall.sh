@@ -1,6 +1,4 @@
-#######################################################"
-################# Turn Off the Firewall ###############"
-#######################################################"
+#### Turn Off the Firewall ###
 echo "Turning off the Firewall..."
 which apt-get &> /dev/null
 if [ $? -eq 0 ] ; then
@@ -21,9 +19,8 @@ else
     chkconfig firewalld off
 fi
 
-# Disable SELinux
 cp /etc/selinux/config /etc/selinux/config.backup
 sed -i 's/SELINUX=enforcing/SELINUX=disabled/g' /etc/selinux/config
-
 setenforce 0
 
+yum install -y -q telnet

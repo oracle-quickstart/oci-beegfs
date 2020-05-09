@@ -80,8 +80,8 @@ if [ $? -eq 0 ]; then
   sed -i -e '/ifeq.*compat-2.6.h/,+3 s/^/# /' /opt/beegfs/src/client/client_module_7/source/Makefile
 fi
 
-# check if clustered networking is setup for the client HPC nodes.  if yes, rebuild beegfs with rdma even if you do not plan to use RDMA for FS. This is required, since RDMA NIC is enabled.
-ifconfig | grep -A2  enp94s0f0 | grep inet
+# if Node is HPC node, then rebuild using RDMA, even if you do not plan to use RDMA for beegfs.
+ifconfig | grep enp94s0f0
 if [ $? -eq 0 ]; then
   sed -i 's|^buildArgs=-j8|buildArgs=-j8 BEEGFS_OPENTK_IBVERBS=1 OFED_INCLUDE_PATH=/usr/src/ofa_kernel/default/include|g' /etc/beegfs/beegfs-client-autobuild.conf
   # Run rebuild command
@@ -119,7 +119,8 @@ systemctl start beegfs-helperd ; systemctl status beegfs-helperd
 systemctl start beegfs-client ; systemctl status beegfs-client
 
 systemctl enable beegfs-helperd
-# systemctl enable beegfs-client
+systemctl disable beegfs-client
+systemctl list-unit-files | grep beegfs
 
 # Retry until successful. It retries until all dependent server nodes and their services/deamons are up and ready for clients to connect and mount file system
 ( while !( systemctl restart beegfs-client )
