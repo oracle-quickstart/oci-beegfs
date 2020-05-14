@@ -6,22 +6,22 @@ TYPE_VIP="mgs_VIP"
 if [ "$management_high_availability" = "true" ]; then
     # Deploy components to implement HA for Management Service
 
-    LOCAL_NODE=`hostname`; echo $LOCAL_NODE
-    LOCAL_NODE_IP=`nslookup $LOCAL_NODE | grep "Address: " | grep -v "#" | gawk '{print $2}'` ; echo $LOCAL_NODE_IP
-    NODE1="${server_hostname_prefix}1" ; echo $NODE1
-    NODE2="${server_hostname_prefix}2" ; echo $NODE2
-    NODE1_IP=`nslookup $NODE1 | grep "Address: " | grep -v "#" | gawk '{print $2}'` ; echo $NODE1_IP
-    NODE2_IP=`nslookup $NODE2 | grep "Address: " | grep -v "#" | gawk '{print $2}'` ; echo $NODE2_IP
-    NODE1_FQDN="${server_hostname_prefix}1.${storage_subnet_domain_name}" ; echo $NODE1
-    NODE2_FQDN="${server_hostname_prefix}2.${storage_subnet_domain_name}" ; echo $NODE2
+    LOCAL_NODE=`hostname`;
+    LOCAL_NODE_IP=`nslookup $LOCAL_NODE | grep "Address: " | grep -v "#" | gawk '{print $2}'` ;
+    NODE1="${server_hostname_prefix}1" ;
+    NODE2="${server_hostname_prefix}2" ;
+    NODE1_IP=`nslookup $NODE1 | grep "Address: " | grep -v "#" | gawk '{print $2}'` ;
+    NODE2_IP=`nslookup $NODE2 | grep "Address: " | grep -v "#" | gawk '{print $2}'` ;
+    NODE1_FQDN="${server_hostname_prefix}1.${storage_subnet_domain_name}" ;
+    NODE2_FQDN="${server_hostname_prefix}2.${storage_subnet_domain_name}" ;
     echo "$NODE1_IP $NODE1_FQDN $NODE1" >> /etc/hosts
     echo "$NODE2_IP $NODE2_FQDN $NODE2" >> /etc/hosts
     # VIRTUAL IP
     TARGET_VIP=$management_vip_private_ip
 
     QUORUM=$quorum_hostname
-    QUORUM_IP=`nslookup $QUORUM | grep "Address: " | grep -v "#" | gawk '{print $2}'` ; echo $QUORUM_IP
-    QUORUM_FQDN="${QUORUM}.${storage_subnet_domain_name}" ; echo $QUORUM_FQDN
+    QUORUM_IP=`nslookup $QUORUM | grep "Address: " | grep -v "#" | gawk '{print $2}'`
+    QUORUM_FQDN="${QUORUM}.${storage_subnet_domain_name}" ;
     echo "$QUORUM_IP $QUORUM_FQDN $QUORUM" >> /etc/hosts
 
 
@@ -29,7 +29,7 @@ if [ "$management_high_availability" = "true" ]; then
     configure_vnics
     if [ "$LOCAL_NODE" = "$NODE1" ]; then
 
-      node1vnic=`curl -s $MDATA_VNIC_URL | jq '.[1].vnicId' | sed 's/"//g' ` ; echo $node1vnic
+      node1vnic=`curl -s $MDATA_VNIC_URL | jq '.[1].vnicId' | sed 's/"//g' `
 
       ssh ${SSH_OPTIONS} opc@${NODE2_IP} "ls -l /home/opc/.ssh/id_rsa"
       while [ $? -ne 0 ]
@@ -39,11 +39,11 @@ if [ "$management_high_availability" = "true" ]; then
         ssh ${SSH_OPTIONS} opc@${NODE2_IP} "ls -l /home/opc/.ssh/id_rsa"
       done
 
-      node2vnic_w_quotes=`ssh ${SSH_OPTIONS} opc@${NODE2_IP} "curl -s $MDATA_VNIC_URL | jq '.[1].vnicId'  "` ; echo $node2vnic_w_quotes
-      node2vnic=`echo $node2vnic_w_quotes |  sed 's/"//g' ` ; echo $node2vnic
+      node2vnic_w_quotes=`ssh ${SSH_OPTIONS} opc@${NODE2_IP} "curl -s $MDATA_VNIC_URL | jq '.[1].vnicId'  "` ;
+      node2vnic=`echo $node2vnic_w_quotes |  sed 's/"//g' `
     else
       # SWAP logic, since its node2 here.
-      node2vnic=`curl -s $MDATA_VNIC_URL | jq '.[1].vnicId' | sed 's/"//g' ` ; echo $node2vnic
+      node2vnic=`curl -s $MDATA_VNIC_URL | jq '.[1].vnicId' | sed 's/"//g' `
 
       ssh ${SSH_OPTIONS} opc@${NODE1_IP} "ls -l /home/opc/.ssh/id_rsa"
       while [ $? -ne 0 ]
@@ -53,11 +53,11 @@ if [ "$management_high_availability" = "true" ]; then
         ssh ${SSH_OPTIONS} opc@${NODE1_IP} "ls -l /home/opc/.ssh/id_rsa"
       done
 
-      node1vnic_w_quotes=`ssh ${SSH_OPTIONS} opc@${NODE1_IP} "curl -s $MDATA_VNIC_URL | jq '.[1].vnicId'  "` ; echo $node1vnic_w_quotes
-      node1vnic=`echo $node1vnic_w_quotes |  sed 's/"//g' ` ; echo $node1vnic
+      node1vnic_w_quotes=`ssh ${SSH_OPTIONS} opc@${NODE1_IP} "curl -s $MDATA_VNIC_URL | jq '.[1].vnicId'  "` ;
+      node1vnic=`echo $node1vnic_w_quotes |  sed 's/"//g' ` ;
     fi
-    subnetCidrBlock=`curl -s $MDATA_VNIC_URL | jq '.[1].subnetCidrBlock  ' | sed 's/"//g' ` ; echo $subnetCidrBlock
-    cidr_netmask=`echo $subnetCidrBlock | gawk -F"/" '{ print $2 }'` ; echo $cidr_netmask
+    subnetCidrBlock=`curl -s $MDATA_VNIC_URL | jq '.[1].subnetCidrBlock  ' | sed 's/"//g' ` ;
+    cidr_netmask=`echo $subnetCidrBlock | gawk -F"/" '{ print $2 }'` ;
 
 
     echo "
@@ -161,7 +161,7 @@ QUORUM_FQDN=\"${QUORUM_FQDN}\"
     if [ "$LOCAL_NODE" = "$NODE2" ]; then
       while ( ! [ -f /etc/corosync/authkey ] )
       do
-        echo "wait for /etc/corosync/authkey to get transfer from node1 before corosync is started on node2"
+        echo "wait for /etc/corosync/authkey to get transfer from node1"
         sleep 5s
       done
     fi
@@ -317,8 +317,8 @@ QUORUM_FQDN=\"${QUORUM_FQDN}\"
       echo 1 > /data/mgt1/beegfs_mgmtd/targetNumID
 
       # beegfs -use 2nd VNIC interface
-      privateIp=`curl -s $MDATA_VNIC_URL | jq '.[1].privateIp ' | sed 's/"//g' ` ; echo $privateIp
-      interface=`ip addr | grep -B2 $privateIp | grep "BROADCAST" | gawk -F ":" ' { print $2 } ' | sed -e 's/^[ \t]*//'` ; echo $interface
+      privateIp=`curl -s $MDATA_VNIC_URL | jq '.[1].privateIp ' | sed 's/"//g' ` ;
+      interface=`ip addr | grep -B2 $privateIp | grep "BROADCAST" | gawk -F ":" ' { print $2 } ' | sed -e 's/^[ \t]*//'` ;
       type="mgmtd"
       cat /etc/beegfs/beegfs-${type}.conf | grep "^connInterfacesFile"
       echo "$interface" > /etc/beegfs/${type}-connInterfacesFile.conf

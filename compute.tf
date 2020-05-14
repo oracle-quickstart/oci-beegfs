@@ -4,15 +4,15 @@ resource "tls_private_key" "ssh" {
 }
 
 locals {
-  storage_subnet_id = var.use_existing_vcn ? var.storage_subnet_id : element(concat(oci_core_subnet.storage.*.id, [""]), 0)
-  fs_subnet_id      = var.use_existing_vcn ? var.fs_subnet_id : element(concat(oci_core_subnet.fs.*.id, [""]), 0)
-  client_subnet_id  = var.use_existing_vcn ? var.fs_subnet_id : element(concat(oci_core_subnet.fs.*.id, [""]), 0)
-  image_id          = (var.use_marketplace_image ? var.mp_listing_resource_id : var.images[var.region])
+  storage_subnet_id   = var.use_existing_vcn ? var.storage_subnet_id : element(concat(oci_core_subnet.storage.*.id, [""]), 0)
+  fs_subnet_id        = var.use_existing_vcn ? var.fs_subnet_id : element(concat(oci_core_subnet.fs.*.id, [""]), 0)
+  client_subnet_id    = var.use_existing_vcn ? var.fs_subnet_id : element(concat(oci_core_subnet.fs.*.id, [""]), 0)
+  image_id            = (var.use_marketplace_image ? var.mp_listing_resource_id : var.images[var.region])
 #  management_image_id = var.management_high_availability ? "ocid1.image.oc1.iad.aaaaaaaa4sdqnx63m74c6v24ch4wqrxy5duvhlzsms47fj2lxuianzc62wma" : local.image_id
 # metadata_image_id = var.metadata_high_availability ? "ocid1.image.oc1.iad.aaaaaaaa4sdqnx63m74c6v24ch4wqrxy5duvhlzsms47fj2lxuianzc62wma" : local.image_id
-management_image_id = var.management_high_availability ? var.ha_mp_listing_resource_id : local.image_id
-metadata_image_id = var.metadata_high_availability ? var.ha_mp_listing_resource_id : local.image_id
-client_image_id = local.client_hpc_shape ? var.hpc_cn_mp_listing_resource_id : local.image_id
+  management_image_id = var.management_high_availability ? var.ha_mp_listing_resource_id : local.image_id
+  metadata_image_id   = var.metadata_high_availability ? var.ha_mp_listing_resource_id : local.image_id
+  client_image_id     = local.client_hpc_shape ? var.hpc_cn_mp_listing_resource_id : local.image_id
 }
 
 
@@ -104,9 +104,13 @@ resource "oci_core_instance" "management_server" {
         "quorum_hostname=\"drbd-quorum-1\"",
         file("${var.scripts_directory}/firewall.sh"),
         file("${var.scripts_directory}/update_resolv_conf.sh"),
+        file("${var.scripts_directory}/nslookup.sh"),
         file("${var.scripts_directory}/configure_vnics.sh"),
-        file("${var.scripts_directory}/install_ha_w_image.sh"),
-        file("${var.scripts_directory}/install_management.sh")
+#        file("${var.scripts_directory}/install_ha_w_image.sh"),
+#        file("${var.scripts_directory}/install_management.sh")
+        (var.management_high_availability ? file("${var.scripts_directory}/install_ha_w_image.sh") : ""),
+        (var.management_high_availability ? "" : file("${var.scripts_directory}/install_management.sh")),
+
       )))}"
     }
 
@@ -220,6 +224,7 @@ resource "oci_core_instance" "metadata_server" {
 "metadata_use_shared_disk=\"${var.metadata_use_shared_disk}\"",
 file("${var.scripts_directory}/firewall.sh"),
 file("${var.scripts_directory}/update_resolv_conf.sh"),
+file("${var.scripts_directory}/nslookup.sh"),
 file("${var.scripts_directory}/configure_vnics.sh"),
 (var.metadata_high_availability ? file("${var.scripts_directory}/install_mds_ha_w_image.sh") : ""),
 (var.metadata_high_availability ? "" : file("${var.scripts_directory}/install_metadata.sh")),
@@ -320,6 +325,7 @@ resource "oci_core_instance" "storage_server" {
         "#!/usr/bin/env bash",
         "set -x",
         "server_node_count=\"${var.storage_server_node_count}\"",
+        "server_hostname_prefix=\"${var.storage_server_hostname_prefix}\"",
         "management_server_filesystem_vnic_hostname_prefix=\"${local.management_server_filesystem_vnic_hostname_prefix}\"",
         "metadata_server_filesystem_vnic_hostname_prefix=\"${local.metadata_server_filesystem_vnic_hostname_prefix}\"",
         "storage_server_filesystem_vnic_hostname_prefix=\"${local.storage_server_filesystem_vnic_hostname_prefix}\"",
@@ -342,6 +348,7 @@ resource "oci_core_instance" "storage_server" {
         "management_vip_private_ip=\"${var.management_vip_private_ip}\"",
         file("${var.scripts_directory}/firewall.sh"),
         file("${var.scripts_directory}/update_resolv_conf.sh"),
+        file("${var.scripts_directory}/nslookup.sh"),
         file("${var.scripts_directory}/install_storage.sh"),
         file("${var.scripts_directory}/storage_tuning.sh"),
       )))}"

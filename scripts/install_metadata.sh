@@ -20,8 +20,8 @@ conf_file="/etc/beegfs/beegfs-meta.conf"
 for disk in $disk_lst
 do
     mount_device_name="/dev/$disk"
-    stride=$((block_size*1024/4096)) ;  echo $stride
-    stripe_width=$((stride*1)) ; echo $stripe_width
+    stride=$((block_size*1024/4096)) ;
+    stripe_width=$((stride*1)) ;
     mkfs.ext4 -i 2048 -I 512 -J size=400 -Odir_index,filetype -E stride=${stride},stripe_width=${stripe_width} -F $mount_device_name
     mkdir -p /data/mdt${count}
     mount -onoatime,nodiratime,user_xattr  $mount_device_name /data/mdt${count}
@@ -76,8 +76,6 @@ done
 
 }
 
-
-
 # Start of script
 
 # Disable locate/mlocate/updatedb
@@ -85,42 +83,60 @@ done
 # Metadata nodes.  The MDT's are mounted at /data/mdtX.
 sed -i 's|/mnt|/mnt /data|g'  /etc/updatedb.conf
 
+wget -O /etc/yum.repos.d/beegfs_rhel7.repo https://www.beegfs.io/release/latest-stable/dists/beegfs-rhel7.repo
+yum install beegfs-meta -y
+
+if [ "$management_high_availability" = "true" ]; then
+  mgmt_host=${management_vip_private_ip}
+else
+  mgmt_host=${management_server_filesystem_vnic_hostname_prefix}1.${filesystem_subnet_domain_name}
+fi
+
+# Call function
+configure_vnics
+
+privateIp=`curl -s $MDATA_VNIC_URL | jq '.[1].privateIp ' | sed 's/"//g' ` ;
+interface=`ip addr | grep -B2 $privateIp | grep "BROADCAST" | gawk -F ":" ' { print $2 } ' | sed -e 's/^[ \t]*//'` ;
+type="meta"
+mkdir -p /etc/beegfs
+echo "$interface" > /etc/beegfs/${type}-connInterfacesFile.conf
+
+
 # All this logic is only for non HA metadata service
 if [ "$metadata_high_availability" = "true" ]; then
   echo "do nothing"
 else
 
-num=`hostname | gawk -F"." '{ print $1 }' | gawk -F"-"  'NF>1&&$0=$(NF)'`
-id=$num
+  num=`hostname | gawk -F"." '{ print $1 }' | gawk -F"-"  'NF>1&&$0=$(NF)'`
+  id=$num
 
-nvme_lst=$(ls /dev/ | grep nvme | grep n1 | sort)
-nvme_cnt=$(ls /dev/ | grep nvme | grep n1 | wc -l)
+  nvme_lst=$(ls /dev/ | grep nvme | grep n1 | sort)
+  nvme_cnt=$(ls /dev/ | grep nvme | grep n1 | wc -l)
 
-disk_lst=$nvme_lst
-disk_cnt=$nvme_cnt
-disk_type="nvme"
-configure_disks
-
-if [ $nvme_cnt -eq 0 ]; then
-
-  # Wait for block-attach of the Block volumes to complete.
-  while [ ! -f /tmp/block-attach.complete ]
-  do
-    sleep 60s
-    echo "Waiting for block-attach via Terraform to  complete ..."
-  done
-
-
-  blk_lst=$(lsblk -d --noheadings | egrep -v -w "sda1|sda2|sda3|sda" | grep -v nvme | awk '{ print $1 }' | sort)
-  blk_cnt=$(lsblk -d --noheadings | egrep -v -w "sda1|sda2|sda3|sda" | grep -v nvme | wc -l)
-
-  disk_lst=$blk_lst
-  disk_cnt=$blk_cnt
-  disk_type="block"
+  disk_lst=$nvme_lst
+  disk_cnt=$nvme_cnt
+  disk_type="nvme"
   configure_disks
 
-# close - if [ $nvme_cnt -eq 0 ]; then
-fi
+  if [ $nvme_cnt -eq 0 ]; then
+
+    # Wait for block-attach of the Block volumes to complete.
+    while [ ! -f /tmp/block-attach.complete ]
+    do
+      sleep 60s
+      echo "Waiting for block-attach via Terraform to  complete ..."
+    done
+
+    blk_lst=$(lsblk -d --noheadings | egrep -v -w "sda1|sda2|sda3|sda" | grep -v nvme | awk '{ print $1 }' | sort)
+    blk_cnt=$(lsblk -d --noheadings | egrep -v -w "sda1|sda2|sda3|sda" | grep -v nvme | wc -l)
+
+    disk_lst=$blk_lst
+    disk_cnt=$blk_cnt
+    disk_type="block"
+    configure_disks
+
+  # close - if [ $nvme_cnt -eq 0 ]; then
+  fi
 
 # close of non-HA metadata if condition
 fi

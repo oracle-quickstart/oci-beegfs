@@ -1,11 +1,6 @@
 set -x
 
-
-
-
-#
 # Start of script
-#
 # All this logic is only for single node - management service
 if [ "$management_high_availability" = "true" ]; then
   mgmt_host=${management_vip_private_ip}
@@ -75,8 +70,8 @@ else
   fi
 
   # Update beegfs files to use 2nd VNIC only, otherwise nodes will try 1st VNIC and then 2nd. It results in high latency.
-  privateIp=`curl -s http://169.254.169.254/opc/v1/vnics/ | jq '.[1].privateIp ' | sed 's/"//g' ` ; echo $privateIp
-  interface=`ip addr | grep -B2 $privateIp | grep "BROADCAST" | gawk -F ":" ' { print $2 } ' | sed -e 's/^[ \t]*//'` ; echo $interface
+  privateIp=`curl -s http://169.254.169.254/opc/v1/vnics/ | jq '.[1].privateIp ' | sed 's/"//g' ` ;
+  interface=`ip addr | grep -B2 $privateIp | grep "BROADCAST" | gawk -F ":" ' { print $2 } ' | sed -e 's/^[ \t]*//'` ;
   type="mgmtd"
   cat /etc/beegfs/beegfs-${type}.conf | grep "^connInterfacesFile"
   echo "$interface" > /etc/beegfs/${type}-connInterfacesFile.conf

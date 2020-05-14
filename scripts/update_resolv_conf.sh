@@ -11,6 +11,6 @@ else
 sed -i "s/^PRESERVE_HOSTINFO/#PRESERVE_HOSTINFO/g" /etc/oci-hostname.conf
 echo "PRESERVE_HOSTINFO=2" >> /etc/oci-hostname.conf
 fi
-# The below is to ensure above changes will not be overwritten by dhclient
+# prevent overwrite by dhclient
 chattr +i /etc/resolv.conf
 

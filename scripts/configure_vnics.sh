@@ -22,10 +22,10 @@ EOF
   systemctl enable secondnic.service
   systemctl start secondnic.service
   vnic_cnt=`/root/secondary_vnic_all_configure.sh | grep "ocid1.vnic." | grep " UP " | wc -l` ;
-  while ( [ $vnic_cnt -le 1 -a $RC -ne 0 ] )
+  RC=1
+  while ( [ $vnic_cnt -le 1 ] || [ $RC -ne 0 ] )
   do
-    # give the infrastructure another 10 seconds to provide the metadata for the second vnic
-    echo waiting for second NIC to come online
+    echo "sleep 10s" 
     sleep 10
     systemctl restart secondnic.service
     RC=$?

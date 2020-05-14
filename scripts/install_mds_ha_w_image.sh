@@ -15,25 +15,17 @@ fi
 # Call function to configure 2nd VNIC
 configure_vnics
 
-privateIp=`curl -s $MDATA_VNIC_URL | jq '.[1].privateIp ' | sed 's/"//g' ` ; echo $privateIp
-interface=`ip addr | grep -B2 $privateIp | grep "BROADCAST" | gawk -F ":" ' { print $2 } ' | sed -e 's/^[ \t]*//'` ; echo $interface
-type="meta"
-mkdir -p /etc/beegfs
-echo "$interface" > /etc/beegfs/${type}-connInterfacesFile.conf
-
-
-
 if [ "$metadata_high_availability" = "true" ]; then
     # Deploy components to implement HA for Metadata Service
 
-    LOCAL_NODE=`hostname`; echo $LOCAL_NODE
-    LOCAL_NODE_IP=`nslookup $LOCAL_NODE | grep "Address: " | grep -v "#" | gawk '{print $2}'` ; echo $LOCAL_NODE_IP
-    NODE1="${server_hostname_prefix}1" ; echo $NODE1
-    NODE2="${server_hostname_prefix}2" ; echo $NODE2
-    NODE1_IP=`nslookup $NODE1 | grep "Address: " | grep -v "#" | gawk '{print $2}'` ; echo $NODE1_IP
-    NODE2_IP=`nslookup $NODE2 | grep "Address: " | grep -v "#" | gawk '{print $2}'` ; echo $NODE2_IP
-    NODE1_FQDN="${server_hostname_prefix}1.${storage_subnet_domain_name}" ; echo $NODE1
-    NODE2_FQDN="${server_hostname_prefix}2.${storage_subnet_domain_name}" ; echo $NODE2
+    LOCAL_NODE=`hostname`;
+    LOCAL_NODE_IP=`nslookup $LOCAL_NODE | grep "Address: " | grep -v "#" | gawk '{print $2}'` ;
+    NODE1="${server_hostname_prefix}1" ;
+    NODE2="${server_hostname_prefix}2" ;
+    NODE1_IP=`nslookup $NODE1 | grep "Address: " | grep -v "#" | gawk '{print $2}'` ;
+    NODE2_IP=`nslookup $NODE2 | grep "Address: " | grep -v "#" | gawk '{print $2}'` ;
+    NODE1_FQDN="${server_hostname_prefix}1.${storage_subnet_domain_name}" ;
+    NODE2_FQDN="${server_hostname_prefix}2.${storage_subnet_domain_name}" ;
     echo "$NODE1_IP $NODE1_FQDN $NODE1" >> /etc/hosts
     echo "$NODE2_IP $NODE2_FQDN $NODE2" >> /etc/hosts
     # VIRTUAL IP
@@ -44,32 +36,32 @@ if [ "$metadata_high_availability" = "true" ]; then
 
     if [ "$LOCAL_NODE" = "$NODE1" ]; then
 
-      node1vnic=`curl -s $MDATA_VNIC_URL | jq '.[1].vnicId' | sed 's/"//g' ` ; echo $node1vnic
+      node1vnic=`curl -s $MDATA_VNIC_URL | jq '.[1].vnicId' | sed 's/"//g' ` ;
 
       ssh ${SSH_OPTIONS}  opc@${NODE2_IP} "ls -l /home/opc/.ssh/id_rsa"
       while [ $? -ne 0 ]
       do
-        echo "wait for TF scripts to copy ssh keys...sleeping"
+        echo "wait for TF scripts to copy ssh keys..."
         sleep 5s
         ssh ${SSH_OPTIONS}  opc@${NODE2_IP} "ls -l /home/opc/.ssh/id_rsa"
       done
 
       node2vnic_w_quotes=`ssh ${SSH_OPTIONS} opc@${NODE2_IP} "curl -s $MDATA_VNIC_URL | jq '.[1].vnicId'  "` ;
-      node2vnic=`echo $node2vnic_w_quotes |  sed 's/"//g' ` ; echo $node2vnic
+      node2vnic=`echo $node2vnic_w_quotes |  sed 's/"//g' ` ;
     else
       # SWAP logic, since its node2 here.
-      node2vnic=`curl -s $MDATA_VNIC_URL | jq '.[1].vnicId' | sed 's/"//g' ` ; echo $node2vnic
+      node2vnic=`curl -s $MDATA_VNIC_URL | jq '.[1].vnicId' | sed 's/"//g' ` ;
 
       ssh ${SSH_OPTIONS}  opc@${NODE1_IP} "ls -l /home/opc/.ssh/id_rsa"
       while [ $? -ne 0 ]
       do
-        echo "wait for TF scripts to copy ssh keys...sleeping"
+        echo "wait for TF scripts to copy ssh keys..."
         sleep 5s
         ssh ${SSH_OPTIONS}  opc@${NODE1_IP} "ls -l /home/opc/.ssh/id_rsa"
       done
 
       node1vnic_w_quotes=`ssh ${SSH_OPTIONS} opc@${NODE1_IP} "curl -s $MDATA_VNIC_URL | jq '.[1].vnicId'  "` ;
-      node1vnic=`echo $node1vnic_w_quotes |  sed 's/"//g' ` ; echo $node1vnic
+      node1vnic=`echo $node1vnic_w_quotes |  sed 's/"//g' ` ;
     fi
     subnetCidrBlock=`curl -s $MDATA_VNIC_URL | jq '.[1].subnetCidrBlock  ' | sed 's/"//g' ` ;
     cidr_netmask=`echo $subnetCidrBlock | gawk -F"/" '{ print $2 }'` ;
@@ -176,7 +168,7 @@ if [ "$metadata_high_availability" = "true" ]; then
     if [ "$LOCAL_NODE" = "$NODE2" ]; then
       while ( ! [ -f /etc/corosync/authkey ] )
       do
-        echo "wait for /etc/corosync/authkey to get transfer from node1 before corosync is started on node2"
+        echo "wait for /etc/corosync/authkey to get transfer from node1"
         sleep 5s
       done
     fi
@@ -340,8 +332,8 @@ fi
     if [ "$LOCAL_NODE" = "$NODE1" ]; then
 
 block_size=4
-stride=$((block_size*1024/4096)) ;  echo $stride
-stripe_width=$((stride*1)) ; echo $stripe_width
+stride=$((block_size*1024/4096)) ;
+stripe_width=$((stride*1)) ;
 
 if [ "$metadata_use_shared_disk" = "false" ]; then
 
@@ -353,8 +345,6 @@ else
 fi
 
       mkfs.ext4 -m 0 -F -i 2048 -I 512 -J size=400 -Odir_index,filetype -E lazy_itable_init=0,lazy_journal_init=0,stride=${stride},stripe_width=${stripe_width},discard -F $device_name
-      #mkfs.ext4 -m 0 -F -E lazy_itable_init=0,lazy_journal_init=0,discard /dev/drbd0
-      #mount -o defaults /dev/drbd0 /data/mdt1
       mount -onoatime,nodiratime,user_xattr $device_name /data/mdt1
 
       mkdir -p /data/mdt1/beegfs_meta
@@ -366,7 +356,7 @@ fi
       echo MDT1 > /data/mdt1/beegfs_meta/targetID
       echo 1 > /data/mdt1/beegfs_meta/targetNumID
 
-      # Update beegfs files to use 2nd VNIC interface
+      # use 2nd VNIC interface
       privateIp=`curl -s $MDATA_VNIC_URL | jq '.[1].privateIp ' | sed 's/"//g' ` ;
       interface=`ip addr | grep -B2 $privateIp | grep "BROADCAST" | gawk -F ":" ' { print $2 } ' | sed -e 's/^[ \t]*//'` ;
       type="meta"

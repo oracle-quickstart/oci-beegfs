@@ -165,9 +165,9 @@ derived_metadata_server_node_count = var.metadata_high_availability ? ((var.meta
   storage_server_dual_nics     = (length(regexall("^BM", var.storage_server_shape)) > 0 ? true : false)
   storage_server_hpc_shape     = (length(regexall("HPC2", var.storage_server_shape)) > 0 ? true : false)
   client_hpc_shape             = (length(regexall("HPC2", var.client_node_shape)) > 0 ? true : false)
-  storage_subnet_domain_name=("${data.oci_core_subnet.storage_subnet.dns_label}.${data.oci_core_vcn.beegfs.dns_label}.oraclevcn.com" )
-  filesystem_subnet_domain_name=( "${data.oci_core_subnet.fs_subnet.dns_label}.${data.oci_core_vcn.beegfs.dns_label}.oraclevcn.com" )
-  vcn_domain_name=("${data.oci_core_vcn.beegfs.dns_label}.oraclevcn.com" )
+  storage_subnet_domain_name=("${data.oci_core_subnet.storage_subnet.dns_label}.${data.oci_core_vcn.vcn.dns_label}.oraclevcn.com" )
+  filesystem_subnet_domain_name=( "${data.oci_core_subnet.fs_subnet.dns_label}.${data.oci_core_vcn.vcn.dns_label}.oraclevcn.com" )
+  vcn_domain_name=("${data.oci_core_vcn.vcn.dns_label}.oraclevcn.com" )
 
   management_server_filesystem_vnic_hostname_prefix = "${var.management_server_hostname_prefix}fs-vnic-"
   metadata_server_filesystem_vnic_hostname_prefix = "${var.metadata_server_hostname_prefix}fs-vnic-"
