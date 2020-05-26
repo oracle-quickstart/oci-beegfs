@@ -28,8 +28,6 @@ if [ "$management_high_availability" = "true" ]; then
       echo sleeping
       NODE1_IP=`nslookup $NODE1 | grep "Address: " | grep -v "#" | gawk '{print $2}'` ;
     done
-    sleep 5s;
-    NODE1_IP=`nslookup $NODE1 | grep "Address: " | grep -v "#" | gawk '{print $2}'` ; echo $NODE1_IP
     NODE2_IP=`nslookup $NODE2 | grep "Address: " | grep -v "#" | gawk '{print $2}'` ; echo $NODE2_IP
     NODE1_FQDN="${server_hostname_prefix}1.${storage_subnet_domain_name}" ; echo $NODE1_FQDN
     NODE2_FQDN="${server_hostname_prefix}2.${storage_subnet_domain_name}" ; echo $NODE2_FQDN

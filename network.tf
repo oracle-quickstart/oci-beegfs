@@ -23,6 +23,7 @@ resource "oci_core_vcn" "vcn" {
   cidr_block     = var.vpc_cidr
   compartment_id = var.compartment_ocid
   display_name   = "${local.cluster_name}_VCN"
+  #dns_label      = "${local.cluster_name}-VCN"
   dns_label      = "beegfs"
 }
 
@@ -118,6 +119,7 @@ resource "oci_core_subnet" "public" {
   security_list_ids = [oci_core_security_list.public_security_list[0].id]
   dhcp_options_id   = oci_core_vcn.vcn[0].default_dhcp_options_id
   dns_label         = "public"
+  #dns_label         = "Public-Subnet"
 }
 
 
@@ -134,12 +136,15 @@ resource "oci_core_subnet" "storage" {
   dhcp_options_id            = oci_core_vcn.vcn[0].default_dhcp_options_id
   prohibit_public_ip_on_vnic = "true"
   dns_label                  = "storage"
+  #dns_label                  = "Private-BeeGFS"
 }
 
 
 resource "oci_core_subnet" "fs" {
   count                      = var.use_existing_vcn ? 0 : 1
-  cidr_block                 = cidrsubnet(var.vpc_cidr, 8, count.index+2)
+  #cidr_block                 = cidrsubnet(var.vpc_cidr, 8, count.index+2)
+  #cidr_block                 = cidrsubnet("172.28.16.0/16", 4, count.index)
+  cidr_block                 = "172.28.16.0/20"
   #display_name               = "${local.cluster_name}_private_fs"
   display_name               = "Private-Subnet"
   compartment_id             = var.compartment_ocid
@@ -149,4 +154,5 @@ resource "oci_core_subnet" "fs" {
   dhcp_options_id            = oci_core_vcn.vcn[0].default_dhcp_options_id
   prohibit_public_ip_on_vnic = "true"
   dns_label                  = "fs"
+  #dns_label                  = "Private-Subnet"
 }

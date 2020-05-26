@@ -4,7 +4,6 @@ TYPE_VIP="mgs_VIP"
 
 
 if [ "$management_high_availability" = "true" ]; then
-    # Deploy components to implement HA for Management Service
 
     LOCAL_NODE=`hostname`;
     LOCAL_NODE_IP=`nslookup $LOCAL_NODE | grep "Address: " | grep -v "#" | gawk '{print $2}'` ;
@@ -16,16 +15,19 @@ if [ "$management_high_availability" = "true" ]; then
     NODE2_FQDN="${server_hostname_prefix}2.${storage_subnet_domain_name}" ;
     echo "$NODE1_IP $NODE1_FQDN $NODE1" >> /etc/hosts
     echo "$NODE2_IP $NODE2_FQDN $NODE2" >> /etc/hosts
-    # VIRTUAL IP
     TARGET_VIP=$management_vip_private_ip
 
     QUORUM=$quorum_hostname
     QUORUM_IP=`nslookup $QUORUM | grep "Address: " | grep -v "#" | gawk '{print $2}'`
+    while [ -z $QUORUM_IP ]
+    do
+      echo sleeping; sleep 5s;
+      QUORUM_IP=`nslookup $QUORUM | grep "Address: " | grep -v "#" | gawk '{print $2}'`
+    done
     QUORUM_FQDN="${QUORUM}.${storage_subnet_domain_name}" ;
     echo "$QUORUM_IP $QUORUM_FQDN $QUORUM" >> /etc/hosts
 
-
-    # Call function to configure 2nd VNIC
+    # Call function
     configure_vnics
     if [ "$LOCAL_NODE" = "$NODE1" ]; then
 
@@ -103,7 +105,7 @@ QUORUM_FQDN=\"${QUORUM_FQDN}\"
     nvme_lst=$(ls /dev/ | grep nvme | grep n1 | sort)
     nvme_cnt=$(ls /dev/ | grep nvme | grep n1 | wc -l)
     if [ $nvme_cnt -eq 0 ]; then
-      # Wait for block-attach to complete. Terraform then creates the below file on server nodes
+      # Terraform creates the below file on server nodes
       while [ ! -f /tmp/block-attach.complete ]
       do
         sleep 60s
@@ -210,8 +212,7 @@ QUORUM_FQDN=\"${QUORUM_FQDN}\"
       echo ${hacluster_user_password} | pcs cluster auth --name beegfs_mgs_cluster ${NODE1} ${NODE2} -u hacluster
     fi
 
-    # use Instance Principal for auth
-    # Configuring OCI-CLI
+    # Configuring OCI-CLI with Instance Principal for auth
     mkdir /home/oracle-cli/
     chown root: /home/oracle-cli/
     chmod 755 /home/oracle-cli/
@@ -264,12 +265,12 @@ QUORUM_FQDN=\"${QUORUM_FQDN}\"
     master-max=1 master-node-max=1 \
     clone-max=2 clone-node-max=1 \
     notify=true
-    # Add filesystem resource
+    # Add filesystem
       pcs -f /root/beegfs_cfg resource create mgt_fs Filesystem \
     device="/dev/drbd0" \
     directory="/data/mgt1" \
     fstype="ext4"
-    # Add IPaddr2 resource
+    # Add IPaddr2
     pcs -f /root/beegfs_cfg resource create mgs_VIP ocf:heartbeat:IPaddr2 ip=${TARGET_VIP} cidr_netmask=${cidr_netmask} op monitor interval=20s
     pcs -f /root/beegfs_cfg alert create id=ip_move description="Move IP address using oci-cli" path=/var/lib/pacemaker/ip_move.sh
     pcs -f /root/beegfs_cfg alert recipient add ip_move id=logfile_ip_move value=/var/log/pacemaker_ip_move.log

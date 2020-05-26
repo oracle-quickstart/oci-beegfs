@@ -24,34 +24,34 @@ variable management_server_disk_vpus_per_gb { default = "Balanced" }
 variable management_server_hostname_prefix { default = "mgs-server-" }
 variable management_high_availability { default = true }
 # Has to be within the subnet "fs" CIDR range. Better to use an IP which is closer to the end of the CIDR range. 
-variable management_vip_private_ip { default = "172.28.6.210" }
+variable management_vip_private_ip { default = "172.28.31.250" }
 
 
 # BeeGFS Metadata (MDS) Server nodes variables  #VM.Standard2.8
-variable metadata_server_shape { default = "VM.Standard2.2" }
+variable metadata_server_shape { default = "VM.Standard2.24" }
 variable metadata_server_node_count { default = 2 }
 # if disk_count > 1, then it create multiple MDS instance, each with 1 disk as MDT for optimal performance. If node has both local nvme ssd and block storage, block storage volumes will be ignored.
 variable metadata_server_disk_count { default = 1 }
 # 500
-variable metadata_server_disk_size { default = 50 }
+variable metadata_server_disk_size { default = 400 }
 # Block volume elastic performance tier.  The number of volume performance units (VPUs) that will be applied to this volume per GB, representing the Block Volume service's elastic performance options. See https://docs.cloud.oracle.com/en-us/iaas/Content/Block/Concepts/blockvolumeelasticperformance.htm for more information.  Allowed values are High, Balanced, and Low.  Recommended value is Balanced for balanced performance and High to receive higher performance (IO throughput and IOPS) per GB.
 variable metadata_server_disk_vpus_per_gb { default = "High" }
 variable metadata_server_hostname_prefix { default = "metadata-server-" }
 variable metadata_high_availability { default = true }
 # Has to be within the subnet "fs" CIDR range. Better to use an IP which is closer to the end of the CIDR range.
-variable metadata_vip_private_ip { default = "172.28.6.211" }
+variable metadata_vip_private_ip { default = "172.28.31.251" }
 # set to true if you want to use OCI Block Volume with Multi-attach feature (SAN like storage) instead of DRBD for replication for HA solution.
 variable metadata_use_shared_disk { default = true }
 
 
 # BeeGFS Stoarage/Object (OSS) Server nodes variables BM.Standard2.52
-variable storage_server_shape { default = "VM.Standard2.2" }
+variable storage_server_shape { default = "BM.Standard2.52" }
 variable storage_server_node_count { default = 2 }
 variable storage_server_hostname_prefix { default = "storage-server-" }
 
-# Client nodes variables VM.Standard2.24, VM.Standard2.2
+# Client nodes variables VM.Standard2.24, VM.Standard2.2 , BM.HPC2.36
 variable client_node_shape { default = "BM.HPC2.36" }
-variable client_node_count { default = 1 }
+variable client_node_count { default = 3 }
 variable client_node_hostname_prefix { default = "client-" }
 
 
@@ -91,7 +91,7 @@ variable "storage_tier_4_disk_type" {
 
 # 8
 variable "storage_tier_1_disk_count" {
-  default = "2"
+  default = "20"
   description = "Number of local NVMe SSD/block volume disk. Each attached as JBOD (no RAID)."
 }
 
@@ -112,7 +112,7 @@ variable "storage_tier_4_disk_count" {
 
 # 800
 variable "storage_tier_1_disk_size" {
-  default = "50"
+  default = "5000"
   description = "If Storage Tier Disk Type is Local_NVMe_SSD, then this field will be ignored.  Otherwise set Size in GB for each block volume/disk, min 50."
 }
 
@@ -155,8 +155,8 @@ variable "ssh_user" { default = "opc" }
 locals {
   # hard coding the default to 1, instead of using var.management_server_node_count, incase user sets it to 2, then logic will fail.
   derived_management_server_node_count = var.management_high_availability ? 2 : 1
-#derived_metadata_server_node_count = var.metadata_high_availability ? 2 : 1
-derived_metadata_server_node_count = var.metadata_high_availability ? ((var.metadata_server_node_count > 1 && var.metadata_server_node_count % 2 == 0) ? var.metadata_server_node_count : "Should be multiplier of 2 for high availabilty" ) : var.metadata_server_node_count
+  #derived_metadata_server_node_count  = var.metadata_high_availability ? 2 : 1
+  derived_metadata_server_node_count   = var.metadata_high_availability ? ((var.metadata_server_node_count > 1 && var.metadata_server_node_count % 2 == 0) ? var.metadata_server_node_count : "Should be multiplier of 2 for high availabilty" ) : var.metadata_server_node_count
 
   management_server_dual_nics  = (length(regexall("^BM", var.management_server_shape)) > 0 ? true : false)
   management_server_hpc_shape  = (length(regexall("HPC2", var.management_server_shape)) > 0 ? true : false)
@@ -165,13 +165,13 @@ derived_metadata_server_node_count = var.metadata_high_availability ? ((var.meta
   storage_server_dual_nics     = (length(regexall("^BM", var.storage_server_shape)) > 0 ? true : false)
   storage_server_hpc_shape     = (length(regexall("HPC2", var.storage_server_shape)) > 0 ? true : false)
   client_hpc_shape             = (length(regexall("HPC2", var.client_node_shape)) > 0 ? true : false)
-  storage_subnet_domain_name=("${data.oci_core_subnet.storage_subnet.dns_label}.${data.oci_core_vcn.vcn.dns_label}.oraclevcn.com" )
-  filesystem_subnet_domain_name=( "${data.oci_core_subnet.fs_subnet.dns_label}.${data.oci_core_vcn.vcn.dns_label}.oraclevcn.com" )
-  vcn_domain_name=("${data.oci_core_vcn.vcn.dns_label}.oraclevcn.com" )
+  storage_subnet_domain_name   = ("${data.oci_core_subnet.storage_subnet.dns_label}.${data.oci_core_vcn.vcn.dns_label}.oraclevcn.com" )
+  filesystem_subnet_domain_name= ( "${data.oci_core_subnet.fs_subnet.dns_label}.${data.oci_core_vcn.vcn.dns_label}.oraclevcn.com" )
+  vcn_domain_name              = ("${data.oci_core_vcn.vcn.dns_label}.oraclevcn.com" )
 
   management_server_filesystem_vnic_hostname_prefix = "${var.management_server_hostname_prefix}fs-vnic-"
-  metadata_server_filesystem_vnic_hostname_prefix = "${var.metadata_server_hostname_prefix}fs-vnic-"
-  storage_server_filesystem_vnic_hostname_prefix = "${var.storage_server_hostname_prefix}fs-vnic-"
+  metadata_server_filesystem_vnic_hostname_prefix   = "${var.metadata_server_hostname_prefix}fs-vnic-"
+  storage_server_filesystem_vnic_hostname_prefix    = "${var.storage_server_hostname_prefix}fs-vnic-"
 
   # If ad_number is non-negative use it for AD lookup, else use ad_name.
   # Allows for use of ad_number in TF deploys, and ad_name in ORM.
