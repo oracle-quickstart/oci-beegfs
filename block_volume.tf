@@ -4,28 +4,27 @@ Copyright © 2020, Oracle and/or its affiliates. All rights reserved.
 The Universal Permissive License (UPL), Version 1.0
 */
 
+/*
+Metadata and Management Block Volume details
+*/
+
 resource "oci_core_volume" "metadata_blockvolume" {
-#count               = var.metadata_server_node_count * var.metadata_server_disk_count
-#count               = (local.derived_metadata_server_node_count * var.metadata_server_disk_count)
-count               =  (var.metadata_use_shared_disk ? ((local.derived_metadata_server_node_count / 2)*var.metadata_server_disk_count)  : (local.derived_metadata_server_node_count * var.metadata_server_disk_count) )
+  count               =  (var.metadata_use_shared_disk ? ((local.derived_metadata_server_node_count / 2)*var.metadata_server_disk_count)  : (local.derived_metadata_server_node_count * var.metadata_server_disk_count) )
 
   availability_domain = local.ad
   compartment_id      = var.compartment_ocid
-#display_name        = "metadata${count.index % var.metadata_server_node_count + 1}-target${count.index % var.metadata_server_disk_count + 1}"
-display_name        = "metadata${count.index % local.derived_metadata_server_node_count + 1}-target${count.index % var.metadata_server_disk_count + 1}"
+  display_name        = "metadata-target${count.index % var.metadata_server_disk_count + 1}"
   size_in_gbs         = var.metadata_server_disk_size
   vpus_per_gb         = var.volume_type_vpus_per_gb_mapping[(var.metadata_server_disk_vpus_per_gb)]
 }
 
 resource "oci_core_volume_attachment" "metadata_blockvolume_attach" {
   attachment_type = "iscsi"
-#count = (var.metadata_server_node_count * var.metadata_server_disk_count)
-count           = (local.derived_metadata_server_node_count * var.metadata_server_disk_count)
-#instance_id = element(oci_core_instance.metadata_server.*.id, count.index % var.metadata_server_node_count,)
+  count           = (local.derived_metadata_server_node_count * var.metadata_server_disk_count)
   instance_id = element(oci_core_instance.metadata_server.*.id, (var.metadata_use_shared_disk ? ((count.index % 2) + (floor(count.index/(var.metadata_server_disk_count*2))*2))   : count.index % local.derived_metadata_server_node_count),)
   volume_id = element(oci_core_volume.metadata_blockvolume.*.id, (var.metadata_use_shared_disk ? floor(count.index/2) : count.index))
   is_shareable = var.metadata_use_shared_disk ? true : false
-device       = var.volume_attach_device_mapping[(count.index % var.metadata_server_disk_count)]
+  device       = var.volume_attach_device_mapping[(var.metadata_use_shared_disk ? floor(count.index/2) : count.index % var.metadata_server_disk_count)]
 
   provisioner "remote-exec" {
     connection {
@@ -33,8 +32,6 @@ device       = var.volume_attach_device_mapping[(count.index % var.metadata_serv
       timeout = "30m"
       host    = element(
         oci_core_instance.metadata_server.*.private_ip,
-        #count.index % var.metadata_server_node_count,
-        #count.index % local.derived_metadata_server_node_count,
         (var.metadata_use_shared_disk ? ((count.index % 2) + (floor(count.index/(var.metadata_server_disk_count*2))*2))   : count.index % local.derived_metadata_server_node_count)
       )
 
@@ -59,7 +56,6 @@ device       = var.volume_attach_device_mapping[(count.index % var.metadata_serv
 */
 resource "null_resource" "notify_metadata_server_nodes_block_attach_complete" {
   depends_on = [ oci_core_volume_attachment.metadata_blockvolume_attach ]
-#count      = var.metadata_server_node_count
   count      = local.derived_metadata_server_node_count
   provisioner "remote-exec" {
     connection {
@@ -82,7 +78,7 @@ resource "null_resource" "notify_metadata_server_nodes_block_attach_complete" {
 
 
 resource "oci_core_volume" "management_blockvolume" {
-  count               = (local.derived_management_server_node_count * var.management_server_disk_count)
+  count               =  (var.management_high_availability ? ((local.derived_management_server_node_count / 2)*var.management_server_disk_count)  : (local.derived_management_server_node_count * var.management_server_disk_count) )
   availability_domain = local.ad
   compartment_id      = var.compartment_ocid
   display_name        = "management${count.index % local.derived_management_server_node_count + 1}-target${count.index % var.management_server_disk_count + 1}"
@@ -93,15 +89,10 @@ resource "oci_core_volume" "management_blockvolume" {
 resource "oci_core_volume_attachment" "management_blockvolume_attach" {
   attachment_type = "iscsi"
   count           = (local.derived_management_server_node_count * var.management_server_disk_count)
-  instance_id     = element(
-    oci_core_instance.management_server.*.id,
-    count.index % local.derived_management_server_node_count,
-  )
-
-  # Using Linux DRBD feature. So don't need this. As a TODO, test if Multi-attach BVol can provide features equivalent to DRBD?
-  # is_shareable = var.management_high_availability ? true : false
-  device       = var.volume_attach_device_mapping[(0)]
-  volume_id        = element(oci_core_volume.management_blockvolume.*.id, count.index)
+  instance_id = element(oci_core_instance.management_server.*.id, (var.management_high_availability ? ((count.index % 2) + (floor(count.index/(var.management_server_disk_count*2))*2))   : count.index % local.derived_management_server_node_count),)
+  volume_id = element(oci_core_volume.management_blockvolume.*.id, (var.management_high_availability ? floor(count.index/2) : count.index))
+  is_shareable = var.management_high_availability ? true : false
+  device       = var.volume_attach_device_mapping[(var.management_high_availability ? floor(count.index/2) : count.index % var.management_server_disk_count)]
 
   provisioner "remote-exec" {
     connection {
@@ -109,7 +100,7 @@ resource "oci_core_volume_attachment" "management_blockvolume_attach" {
       timeout = "30m"
       host    = element(
         oci_core_instance.management_server.*.private_ip,
-        count.index % local.derived_management_server_node_count,
+        (var.management_high_availability ? ((count.index % 2) + (floor(count.index/(var.management_server_disk_count*2))*2))   : count.index % local.derived_management_server_node_count)
       )
       user                = var.ssh_user
       private_key         = tls_private_key.ssh.private_key_pem

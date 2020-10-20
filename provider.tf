@@ -21,5 +21,4 @@ variable "private_key_path" {
 variable "ssh_private_key" {
 }
 
-variable "ssh_private_key_path" {
-}
+#variable "ssh_private_key_path" { }

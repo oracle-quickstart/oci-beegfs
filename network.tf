@@ -111,7 +111,6 @@ resource "oci_core_security_list" "private_security_list" {
 resource "oci_core_subnet" "public" {
   count             = var.use_existing_vcn ? 0 : 1
   cidr_block        = cidrsubnet(var.vpc_cidr, 8, count.index)
-  #display_name      = "${local.cluster_name}_public"
   display_name      = "Public-Subnet"
   compartment_id    = var.compartment_ocid
   vcn_id            = oci_core_vcn.vcn[0].id
@@ -119,7 +118,6 @@ resource "oci_core_subnet" "public" {
   security_list_ids = [oci_core_security_list.public_security_list[0].id]
   dhcp_options_id   = oci_core_vcn.vcn[0].default_dhcp_options_id
   dns_label         = "public"
-  #dns_label         = "Public-Subnet"
 }
 
 
@@ -127,7 +125,6 @@ resource "oci_core_subnet" "public" {
 resource "oci_core_subnet" "storage" {
   count                      = var.use_existing_vcn ? 0 : 1
   cidr_block                 = cidrsubnet(var.vpc_cidr, 8, count.index+1)
-  #display_name               = "${local.cluster_name}_private_storage"
   display_name               = "Private-BeeGFS"
   compartment_id             = var.compartment_ocid
   vcn_id                     = oci_core_vcn.vcn[0].id
@@ -136,16 +133,12 @@ resource "oci_core_subnet" "storage" {
   dhcp_options_id            = oci_core_vcn.vcn[0].default_dhcp_options_id
   prohibit_public_ip_on_vnic = "true"
   dns_label                  = "storage"
-  #dns_label                  = "Private-BeeGFS"
 }
 
 
 resource "oci_core_subnet" "fs" {
   count                      = var.use_existing_vcn ? 0 : 1
-  #cidr_block                 = cidrsubnet(var.vpc_cidr, 8, count.index+2)
-  #cidr_block                 = cidrsubnet("172.28.16.0/16", 4, count.index)
-  cidr_block                 = "172.28.16.0/20"
-  #display_name               = "${local.cluster_name}_private_fs"
+  cidr_block                 = cidrsubnet(var.vpc_cidr, 8, count.index+2)
   display_name               = "Private-Subnet"
   compartment_id             = var.compartment_ocid
   vcn_id                     = oci_core_vcn.vcn[0].id
@@ -154,5 +147,4 @@ resource "oci_core_subnet" "fs" {
   dhcp_options_id            = oci_core_vcn.vcn[0].default_dhcp_options_id
   prohibit_public_ip_on_vnic = "true"
   dns_label                  = "fs"
-  #dns_label                  = "Private-Subnet"
 }

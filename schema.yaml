@@ -20,7 +20,10 @@ groupings:
     - mp_listing_resource_id
     - mp_listing_resource_version
     - use_marketplace_image
-    - beegfs_high_availability
+    - ha_vip_mapping
+    - hpc_cn_mp_listing_id
+    - hpc_cn_mp_listing_resource_id
+    - hpc_cn_mp_listing_resource_version
   - title: "VCN Configuration"
     visible: true
     variables:
@@ -35,6 +38,17 @@ groupings:
     variables:
     - ssh_public_key
     - ad_name
+    - use_custom_name
+    - cluster_name
+    - beegfs_high_availability
+    - management_high_availability
+    - management_vip_private_ip
+    - metadata_high_availability
+    - metadata_use_shared_disk
+    - metadata_vip_private_ip
+    - storage_high_availability
+    - storage_use_shared_disk
+    - storage_vip_private_ip
   - title: "Bastion Instance Configuration"
     visible: true
     variables:
@@ -146,11 +160,11 @@ variables:
 
   management_server_node_count:
     title: "Number of management server"
-    description: "Number of management server instances."
+    description: "Number of management server instances. Minimum one instance required for non high availability setup and two for highly available management service."
     type: integer
     default: 1
     minimum: 1
-    maximum: 1
+    maximum: 2
     required: true
 
   management_server_hostname_prefix:
@@ -161,16 +175,16 @@ variables:
 
   management_server_disk_count:
     title: "Number of block volumes"
-    description: "Number of block volumes for each management server. Local NVME will be prefered (and block unused) if available."
+    description: "Number of block volumes for each management server. Local NVME will be prefered (and block unused) if available. Maximum 1 local NVMe SSD or 1 Block Volume allowed. Min: 0. "
     type: integer
     default: 1
     minimum: 0
-    maximum: 31
+    maximum: 1
     required: true
 
   management_server_disk_size:
     title: "Block volume size"
-    description: "Size in GB for block volumes attached to management server, min 50."
+    description: "Size in GB for block volumes attached to management server, min 50GB is more than enough."
     type: integer
     default: 50
     minimum: 50
@@ -186,7 +200,7 @@ variables:
     - "Balanced"
     - "Low"
     required: true
-    default: "High"
+    default: "Balanced"
 
   metadata_server_shape:
     title: "Metadata Server Compute Shape"
@@ -218,12 +232,12 @@ variables:
     type: integer
     default: 1
     minimum: 0
-    maximum: 31
+    maximum: 1
     required: true
 
   metadata_server_disk_size:
     title: "Block volume size"
-    description: "Size in GB for block volumes attached to metadata server, min 50."
+    description: "Size in GB for block volumes attached to metadata server, min 50. Example - 500GB High Performance Block Volume will give you 35K IOPS and should be enough to store 150 million files."
     type: integer
     default: 500
     minimum: 50
@@ -234,7 +248,6 @@ variables:
     description: "Block volume performance"
     type: enum
     enum:
-    - "Local_NVMe_SSD"
     - "High"
     - "Balanced"
     - "Low"
@@ -398,6 +411,7 @@ variables:
     description: "Number of client instances."
     type: integer
     default: 1
+    minimum: 0
     required: true
 
   client_node_hostname_prefix:
@@ -419,11 +433,52 @@ variables:
     description: "Mount point on client instances for BeeGFS filesystem. "
 
   beegfs_high_availability:
-    type: string
+    type: boolean
     required: true
-    default: "false"
-    description: "For future use."
-    visible: false
+    default: false
+    description: "Select checkbox to deploy BeeGFS file system with high availability."
+    visible: true
+
+  management_high_availability:
+    type: boolean
+    required: false
+    default: false
+    description: "Select checkbox to deploy BeeGFS Management service with high availability(HA). Two nodes configured with Network Attached Shared Disk/Block Volume Storage and Corosync/Pacemaker for HA"
+    visible: ${beegfs_high_availability}
+
+  metadata_high_availability:
+    type: boolean
+    required: false
+    default: false
+    description: "Select checkbox to deploy BeeGFS Metadata service with high availability(HA)."
+    visible: ${beegfs_high_availability}
+
+  storage_high_availability:
+    type: boolean
+    required: false
+    default: false
+    description: "Select checkbox to deploy BeeGFS Storage service with high availability(HA)."
+    visible: ${beegfs_high_availability}
+
+  metadata_use_shared_disk:
+    type: boolean
+    required: false
+    default: false
+    description: "Select checkbox to use Network Attached Shared Disks for high availability(HA) to reduce storage cost.  If checkbox is not selected, it will use BeeGFS Buddy Mirror/Replication for HA."
+    visible:
+      and:
+        - ${beegfs_high_availability}
+        - ${metadata_high_availability}
+
+  storage_use_shared_disk:
+    type: boolean
+    required: false
+    default: false
+    description: "Select checkbox to use Network Attached Shared Disks for high availability(HA) to reduce storage cost.  If checkbox is not selected, it will use BeeGFS Buddy Mirror/Replication for HA."
+    visible:
+      and:
+        - ${beegfs_high_availability}
+        - ${storage_high_availability}
 
   ad_number:
     description: "Shadowed TF value to ignore"
@@ -518,3 +573,72 @@ variables:
       hidePublicSubnet: true
     visible: ${use_existing_vcn}
     required: true
+
+  management_vip_private_ip:
+    type: string
+    title: "Management Virtual IP for HA (Highly Availability)"
+    description: "Floating Virtual IP to assign to an active node in an active/passive HA cluster. Only one VIP is needed.  Provide an unused private IP from FS private subnet. Refer to network architecture diagrams here: https://github.com/oracle-quickstart/oci-beegfs."
+    required: false
+    default: "10.0.2.254"
+    visible:
+      and:
+        - ${beegfs_high_availability}
+        - ${management_high_availability}
+
+  metadata_vip_private_ip:
+    type: string
+    title: "Metadata Virtual IPs for HA (Highly Availability)"
+    description: "Floating Virtual IPs to assign to each active node in an active/passive HA pair. For every two Metadata servers, one VIP is needed.  If you have four Metadata servers, then two VIPs need to be provided as a comma seperated list.  Provide an unused private IP from FS private subnet. Refer to network architecture diagrams here: https://github.com/oracle-quickstart/oci-beegfs."
+    required: false
+    default: "10.0.2.253,10.0.2.252"
+    visible:
+      and:
+        - ${beegfs_high_availability}
+        - ${metadata_high_availability}
+        - ${metadata_use_shared_disk}
+
+  storage_vip_private_ip:
+    type: string
+    title: "Storage Virtual IPs for HA (Highly Availability)"
+    description: "Floating Virtual IPs to assign to each active node in an active/passive HA pair. For every two Storage servers, one VIP is needed.  If you have four Storage servers, then two VIPs need to be provided as a comma seperated list.  Provide an unused private IP from FS private subnet. Refer to network architecture diagrams here: https://github.com/oracle-quickstart/oci-beegfs."
+    required: false
+    default: "10.0.2.251,10.0.2.250"
+    visible:
+      and:
+        - ${beegfs_high_availability}
+        - ${storage_high_availability}
+        - ${storage_use_shared_disk}
+  use_custom_name: 
+    type: boolean
+    title: "use custom cluster name"
+    description: "Use custom name for the cluster" 
+    required: true
+    default: false
+  cluster_name: 
+    title: "Name of the cluster" 
+    description: "Custom cluster name"
+    type: string
+    visible: 
+      and: 
+        - ${use_custom_name}
+  ha_vip_mapping:
+    type: string
+    title: "ha_vip_mapping"
+    description: "Variable Map to use default VIP for HA failover."
+    default: ""
+  hpc_cn_mp_listing_id:
+    type: string
+    title: "hpc_cn_mp_listing_id"
+    description: "hpc_cn_mp_listing_id."
+    default: ""
+  hpc_cn_mp_listing_resource_id:
+    type: string
+    title: "hpc_cn_mp_listing_resource_id"
+    description: "hpc_cn_mp_listing_resource_id."
+    default: ""
+  hpc_cn_mp_listing_resource_version:
+    type: string
+    title: "hpc_cn_mp_listing_resource_version"
+    description: "hpc_cn_mp_listing_resource_version."
+    default: ""
+

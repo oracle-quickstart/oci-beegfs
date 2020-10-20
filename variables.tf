@@ -7,8 +7,53 @@
 
 
 # 172.28.0.0/16   10.0.0.0/16
-variable "vpc_cidr" { default = "172.28.0.0/16" }
+variable vpc_cidr { default = "10.0.0.0/16" }
 
+variable beegfs_high_availability { default = true }
+variable management_high_availability { default = true }
+variable metadata_high_availability { default = true }
+variable storage_high_availability { default = true }
+
+# set to true if you want to use OCI Block Volume with Multi-attach feature (SAN like storage) instead of BeeGFS Buddy Mirror/replication feature for HA solution.
+variable metadata_use_shared_disk { default = true }
+# set to true if you want to use OCI Block Volume with Multi-attach feature (SAN like storage) instead of BeeGFS Buddy Mirror/replication feature for HA solution.
+variable storage_use_shared_disk { default = true }
+
+
+# Has to be within the subnet "fs" CIDR range. Better to use an IP which is closer to the end of the CIDR range.
+variable management_vip_private_ip { default = "10.0.2.254" }
+
+# we need to define a VIP for each pair of metadata servers.
+# Has to be within the subnet "fs" CIDR range. Better to use an IP which is closer to the end of the CIDR range.
+variable "metadata_vip_private_ip" {
+  #default = ["10.0.2.253","10.0.2.252"]
+}
+
+# we need to define a VIP for each pair of storage servers.
+variable "storage_vip_private_ip" {  #default = ["10.0.2.251","10.0.2.250"]
+}
+
+variable "ha_vip_mapping" {
+  type = map(string)
+  default = {
+    "1"  = "10.0.2.254"
+    "2"  = "10.0.2.253"
+    "3"  = "10.0.2.252"
+    "4"  = "10.0.2.251"
+    "5"  = "10.0.2.250"
+    "6"  = "10.0.2.249"
+    "7"  = "10.0.2.248"
+    "8"  = "10.0.2.247"
+    "9"  = "10.0.2.246"
+    "10"  = "10.0.2.245"
+    "11"  = "10.0.2.244"
+    "12"  = "10.0.2.243"
+    "13"  = "10.0.2.242"
+    "14"  = "10.0.2.241"
+    "15"  = "10.0.2.240"
+    "16"  = "10.0.2.239"
+  }
+}
 
 variable bastion_shape { default = "VM.Standard2.2" }
 variable bastion_node_count { default = 1 }
@@ -22,9 +67,6 @@ variable management_server_disk_size { default = 50 }
 # Block volume elastic performance tier.  The number of volume performance units (VPUs) that will be applied to this volume per GB, representing the Block Volume service's elastic performance options. See https://docs.cloud.oracle.com/en-us/iaas/Content/Block/Concepts/blockvolumeelasticperformance.htm for more information.  Allowed values are High, Balanced, and Low.  Recommended value is Balanced for balanced performance and High to receive higher performance (IO throughput and IOPS) per GB.
 variable management_server_disk_vpus_per_gb { default = "Balanced" }
 variable management_server_hostname_prefix { default = "mgs-server-" }
-variable management_high_availability { default = true }
-# Has to be within the subnet "fs" CIDR range. Better to use an IP which is closer to the end of the CIDR range. 
-variable management_vip_private_ip { default = "172.28.31.250" }
 
 
 # BeeGFS Metadata (MDS) Server nodes variables  #VM.Standard2.8
@@ -37,17 +79,13 @@ variable metadata_server_disk_size { default = 400 }
 # Block volume elastic performance tier.  The number of volume performance units (VPUs) that will be applied to this volume per GB, representing the Block Volume service's elastic performance options. See https://docs.cloud.oracle.com/en-us/iaas/Content/Block/Concepts/blockvolumeelasticperformance.htm for more information.  Allowed values are High, Balanced, and Low.  Recommended value is Balanced for balanced performance and High to receive higher performance (IO throughput and IOPS) per GB.
 variable metadata_server_disk_vpus_per_gb { default = "High" }
 variable metadata_server_hostname_prefix { default = "metadata-server-" }
-variable metadata_high_availability { default = true }
-# Has to be within the subnet "fs" CIDR range. Better to use an IP which is closer to the end of the CIDR range.
-variable metadata_vip_private_ip { default = "172.28.31.251" }
-# set to true if you want to use OCI Block Volume with Multi-attach feature (SAN like storage) instead of DRBD for replication for HA solution.
-variable metadata_use_shared_disk { default = true }
 
 
 # BeeGFS Stoarage/Object (OSS) Server nodes variables BM.Standard2.52
 variable storage_server_shape { default = "BM.Standard2.52" }
 variable storage_server_node_count { default = 2 }
 variable storage_server_hostname_prefix { default = "storage-server-" }
+
 
 # Client nodes variables VM.Standard2.24, VM.Standard2.2 , BM.HPC2.36
 variable client_node_shape { default = "BM.HPC2.36" }
@@ -60,8 +98,6 @@ variable client_node_hostname_prefix { default = "client-" }
 # Default file stripe size (aka chunk_size) used by clients to striping file data and send to desired number of storage targets (OSTs). Example: 1m, 512k, 2m, etc
 variable beegfs_stripe_size { default = "1m" }
 variable beegfs_mount_point { default = "/mnt/beegfs" }
-# To be supported in future
-variable beegfs_high_availability { default = false }
 
 # This is currently used for the deployment.  
 variable "ad_number" {
@@ -157,6 +193,7 @@ locals {
   derived_management_server_node_count = var.management_high_availability ? 2 : 1
   #derived_metadata_server_node_count  = var.metadata_high_availability ? 2 : 1
   derived_metadata_server_node_count   = var.metadata_high_availability ? ((var.metadata_server_node_count > 1 && var.metadata_server_node_count % 2 == 0) ? var.metadata_server_node_count : "Should be multiplier of 2 for high availabilty" ) : var.metadata_server_node_count
+  derived_storage_server_node_count   = var.storage_high_availability ? ((var.storage_server_node_count > 1 && var.storage_server_node_count % 2 == 0) ? var.storage_server_node_count : "Should be multiplier of 2 for high availabilty" ) : var.storage_server_node_count
 
   management_server_dual_nics  = (length(regexall("^BM", var.management_server_shape)) > 0 ? true : false)
   management_server_hpc_shape  = (length(regexall("HPC2", var.management_server_shape)) > 0 ? true : false)
@@ -179,7 +216,7 @@ locals {
   ad = "${var.ad_number >= 0 ? lookup(data.oci_identity_availability_domains.availability_domains.availability_domains[max(0,var.ad_number)],"name") : var.ad_name}"
 }
 
-
+/*
 variable "imagesCentos" {
   type = map(string)
   default = {
@@ -192,6 +229,7 @@ variable "imagesCentos" {
     us-phoenix-1   = "ocid1.image.oc1.phx.aaaaaaaaa2ph5vy4u7vktmf3c6zemhlncxkomvay2afrbw5vouptfbydwmtq"
   }
 }
+*/
 
 // See https://docs.cloud.oracle.com/en-us/iaas/images/image/0a72692a-bdbb-46fc-b17b-6e0a3fedeb23/
 // Oracle-provided image "Oracle-Linux-7.7-2020.01.28-0"
@@ -282,24 +320,66 @@ variable "volume_type_vpus_per_gb_mapping" {
 resource "random_string" "hacluster_user_password" {
   length      = 16
   special     = true
+  min_special = 2
   upper       = true
   min_upper   = 2
+  lower       = true
+  min_lower   = 2 
   number      = true
   min_numeric = 2
+  override_special = "!@#-_&*=+"
 }
 
 output "hacluster_user_password" {
   value = ["${random_string.hacluster_user_password.result}"]
 }
 
+/*
+Range of VIP IPs to use for up 20 OSS servers in a cluster.
+Only required if storage_use_shared_disk=true for HA
+For HA with Beegfs Buddy Mirror - this is not used. 
 
+variable "oss_vip_private_ip" {
+  type = map(string)
+  default = {
+    "0"      = "10.0.2.252"
+    "2"      = "10.0.2.251"
+    "4"      = "10.0.2.250"
+    "6"      = "10.0.2.249"
+    "8"      = "10.0.2.248"
+    "10"     = "10.0.2.247"
+    "12"     = "10.0.2.246"
+    "14"     = "10.0.2.245"
+    "16"     = "10.0.2.244"
+    "18"     = "10.0.2.243"
+  }
+}
+*/
 
+#-------------------------------------------------------------------------------------------------------------
+# Marketplace variables
+# hpc-filesystem-BeeGFS-OL77_4.14.35-1902.10.4.el7uek.x86_64
+# Oracle Linux 7.7 UEK Image for BeeGFS filesystem on Oracle Cloud Infrastructure
+# ------------------------------------------------------------------------------------------------------------
+
+variable "mp_listing_id" {
+  default = "ocid1.appcataloglisting.oc1..aaaaaaaadu427jmx3pbdw76ek6xkgin4ucmfbrlsavb45snvzk5d7ckrs3nq"
+}
+variable "mp_listing_resource_id" {
+  default = "ocid1.image.oc1..aaaaaaaa6pvs3ovuveqb7pepzjhemyykkyjae7tttrb2fkf5adzwqm3izvxq"
+}
+variable "mp_listing_resource_version" {
+ default = "1.0"
+}
+variable "use_marketplace_image" {
+  default = true
+}
 
 #-------------------------------------------------------------------------------------------------------------
 # Marketplace variables
 # hpc-filesystem-BeeGFS-OL77_3.10.0-1062.9.1.el7.x86_64
 # ------------------------------------------------------------------------------------------------------------
-
+/*
 variable "mp_listing_id" {
   default = "ocid1.appcataloglisting.oc1..aaaaaaaajmdokvtzailtlchqxk7nai45fxar6em7dfbdibxmspjsvs4uz3uq"
 }
@@ -309,10 +389,10 @@ variable "mp_listing_resource_id" {
 variable "mp_listing_resource_version" {
  default = "1.0"
 }
-
 variable "use_marketplace_image" {
   default = true
 }
+*/
 
 # ------------------------------------------------------------------------------------------------------------
 
@@ -321,18 +401,16 @@ variable "use_marketplace_image" {
 # Marketplace variables for Management Server High Availability setup
 # Artifact - High_Availability_DRBD_Pacemaker_Corosync_OL77_3.10.0-1062.9.1.el7
 # ------------------------------------------------------------------------------------------------------------
-
-variable "ha_mp_listing_id" {
+/*
+variable "mp_listing_id" {
 default = "ocid1.appcataloglisting.oc1..aaaaaaaayhsvdenfgrpw6jich4o6t2gtgfrudyfgih5i7z2dmjfqowalmerq"
 }
-variable "ha_mp_listing_resource_id" {
+variable "mp_listing_resource_id" {
 default = "ocid1.image.oc1..aaaaaaaanvvgvh3237ggcsxpzbielgrixuepfbylohfn6752nohhlzgmkzsa"
 }
-variable "ha_mp_listing_resource_version" {
+variable "mp_listing_resource_version" {
 default = "1.0_03052020"
 }
-
-/*
 variable "use_marketplace_image" {
 default = true
 }
@@ -380,9 +458,3 @@ variable "fs_subnet_id" {
 
 
 
-#############
-##  THIS IS TO BE USED TO CREATE A NEW IMAGE with HA packages like DRBD, Pacemaker, Corosync.  For normal BeeGFS operation, this is not needed. Please do not change these values.
-############
-variable image_server_shape { default = "VM.Standard2.2" }
-variable image_server_node_count { default = 0 }
-variable image_server_hostname_prefix { default = "image-server-" }
