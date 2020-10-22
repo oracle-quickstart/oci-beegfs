@@ -53,12 +53,14 @@ groupings:
     visible: true
     variables:
     - bastion_shape
+    - bastion_ocpus
     - bastion_node_count
     - bastion_hostname_prefix
   - title: "BeeGFS Management Service Configuration"
     visible: true
     variables:
     - management_server_shape
+    - management_server_ocpus
     - management_server_node_count
     - management_server_hostname_prefix
     - management_server_disk_count
@@ -68,6 +70,7 @@ groupings:
     visible: true
     variables:
     - metadata_server_shape
+    - metadata_server_ocpus
     - metadata_server_node_count
     - metadata_server_hostname_prefix
     - metadata_server_disk_count
@@ -77,6 +80,7 @@ groupings:
     visible: true
     variables:
     - storage_server_shape
+    - storage_server_ocpus
     - storage_server_node_count
     - storage_server_hostname_prefix
   - title: "BeeGFS Storage Tiering Configuration"
@@ -97,12 +101,11 @@ groupings:
   - title: "BeeGFS Client Instance Configuration"
     visible: true
     variables:
+    - create_client_nodes
     - client_node_shape
+    - client_node_ocpus
     - client_node_count
     - client_node_hostname_prefix
-  - title: "BeeGFS Filesystem Configuration"
-    visible: true
-    variables:
     - beegfs_stripe_size
     - beegfs_mount_point
 
@@ -126,12 +129,47 @@ variables:
   bastion_shape:
     title: "Bastion Compute Shape"
     description: "Shape for bastion instances."
-    type: oci:core:instanceshape:name
     default: "VM.Standard2.2"
     required: true
-    dependsOn:
-      compartmentId: ${compartment_ocid}
-      imageId: ${mp_listing_resource_id}
+    type: enum
+    enum:
+    - "VM.DenseIO2.8"
+    - "VM.DenseIO2.16"
+    - "VM.DenseIO2.24"
+    - "VM.Standard2.1"
+    - "VM.Standard2.2"
+    - "VM.Standard2.4"
+    - "VM.Standard2.8"
+    - "VM.Standard2.16"
+    - "VM.Standard2.24"
+    - "VM.Standard.E2.1"
+    - "VM.Standard.E2.2"
+    - "VM.Standard.E2.4"
+    - "VM.Standard.E2.8"
+    - "VM.Standard.E3.Flex"
+    - "VM.GPU3.1"
+    - "VM.GPU3.2"
+    - "VM.GPU3.4"
+    - "BM.Standard2.52"
+    - "BM.Standard.E2.64"
+    - "BM.Standard.E3.128"
+    - "BM.DenseIO2.52"
+    - "BM.HPC2.36"
+    - "BM.GPU3.8"
+
+  bastion_ocpus:
+    title: Cores
+    type: integer
+    description: Number of OCPU's for flex shape
+    minimum: 1
+    maximum: 64
+    default: 2
+    visible:
+      eq:
+        - ${bastion_shape}
+        - "VM.Standard.E3.Flex"
+    required: true
+
 
   bastion_node_count:
     title: "Number of bastion"
@@ -151,12 +189,46 @@ variables:
   management_server_shape:
     title: "Management Server Compute Shape"
     description: "Shape for management server instances."
-    type: oci:core:instanceshape:name
     default: "VM.Standard2.2"
     required: true
-    dependsOn:
-      compartmentId: ${compartment_ocid}
-      imageId: ${mp_listing_resource_id}
+    type: enum
+    enum:
+    - "VM.DenseIO2.8"
+    - "VM.DenseIO2.16"
+    - "VM.DenseIO2.24"
+    - "VM.Standard2.1"
+    - "VM.Standard2.2"
+    - "VM.Standard2.4"
+    - "VM.Standard2.8"
+    - "VM.Standard2.16"
+    - "VM.Standard2.24"
+    - "VM.Standard.E2.1"
+    - "VM.Standard.E2.2"
+    - "VM.Standard.E2.4"
+    - "VM.Standard.E2.8"
+    - "VM.Standard.E3.Flex"
+    - "VM.GPU3.1"
+    - "VM.GPU3.2"
+    - "VM.GPU3.4"
+    - "BM.Standard2.52"
+    - "BM.Standard.E2.64"
+    - "BM.Standard.E3.128"
+    - "BM.DenseIO2.52"
+    - "BM.HPC2.36"
+    - "BM.GPU3.8"
+
+  management_server_ocpus:
+    title: Cores
+    type: integer
+    description: Number of OCPU's for flex shape
+    minimum: 1
+    maximum: 64
+    default: 2
+    visible:
+      eq:
+        - ${management_server_shape}
+        - "VM.Standard.E3.Flex"
+    required: true
 
   management_server_node_count:
     title: "Number of management server"
@@ -205,12 +277,47 @@ variables:
   metadata_server_shape:
     title: "Metadata Server Compute Shape"
     description: "Shape for metadata server instances."
-    type: oci:core:instanceshape:name
     default: "VM.Standard2.8"
     required: true
-    dependsOn:
-      compartmentId: ${compartment_ocid}
-      imageId: ${mp_listing_resource_id}
+    type: enum
+    enum:
+    - "VM.DenseIO2.8"
+    - "VM.DenseIO2.16"
+    - "VM.DenseIO2.24"
+    - "VM.Standard2.1"
+    - "VM.Standard2.2"
+    - "VM.Standard2.4"
+    - "VM.Standard2.8"
+    - "VM.Standard2.16"
+    - "VM.Standard2.24"
+    - "VM.Standard.E2.1"
+    - "VM.Standard.E2.2"
+    - "VM.Standard.E2.4"
+    - "VM.Standard.E2.8"
+    - "VM.Standard.E3.Flex"
+    - "VM.GPU3.1"
+    - "VM.GPU3.2"
+    - "VM.GPU3.4"
+    - "BM.Standard2.52"
+    - "BM.Standard.E2.64"
+    - "BM.Standard.E3.128"
+    - "BM.DenseIO2.52"
+    - "BM.HPC2.36"
+    - "BM.GPU3.8"
+
+  metadata_server_ocpus:
+    title: Cores
+    type: integer
+    description: Number of OCPU's for flex shape
+    minimum: 1
+    maximum: 64
+    default: 2
+    visible:
+      eq:
+        - ${metadata_server_shape}
+        - "VM.Standard.E3.Flex"
+    required: true
+
 
   metadata_server_node_count:
     title: "Number of metadata server"
@@ -257,12 +364,47 @@ variables:
   storage_server_shape:
     title: "Storage Server Compute Shape"
     description: "Shape for storage server instances."
-    type: oci:core:instanceshape:name
     default: "BM.Standard2.52"
     required: true
-    dependsOn:
-      compartmentId: ${compartment_ocid}
-      imageId: ${mp_listing_resource_id}
+    type: enum
+    enum:
+    - "VM.DenseIO2.8"
+    - "VM.DenseIO2.16"
+    - "VM.DenseIO2.24"
+    - "VM.Standard2.1"
+    - "VM.Standard2.2"
+    - "VM.Standard2.4"
+    - "VM.Standard2.8"
+    - "VM.Standard2.16"
+    - "VM.Standard2.24"
+    - "VM.Standard.E2.1"
+    - "VM.Standard.E2.2"
+    - "VM.Standard.E2.4"
+    - "VM.Standard.E2.8"
+    - "VM.Standard.E3.Flex"
+    - "VM.GPU3.1"
+    - "VM.GPU3.2"
+    - "VM.GPU3.4"
+    - "BM.Standard2.52"
+    - "BM.Standard.E2.64"
+    - "BM.Standard.E3.128"
+    - "BM.DenseIO2.52"
+    - "BM.HPC2.36"
+    - "BM.GPU3.8"
+
+  storage_server_ocpus:
+    title: Cores
+    type: integer
+    description: Number of OCPU's for flex shape
+    minimum: 1
+    maximum: 64
+    default: 2
+    visible:
+      eq:
+        - ${storage_server_shape}
+        - "VM.Standard.E3.Flex"
+    required: true
+
 
   storage_server_node_count:
     title: "Number of storage server"
@@ -299,6 +441,12 @@ variables:
     minimum: 1
     maximum: 31
     required: true
+    visible:
+      not:
+        - eq:
+            - ${storage_tier_1_disk_type}
+            - "Local_NVMe_SSD"
+
 
   storage_tier_1_disk_size:
     title: "Block volume size"
@@ -308,6 +456,12 @@ variables:
     minimum: 50
     maximum: 32768
     required: true
+    visible:
+      not:
+        - eq:
+            - ${storage_tier_1_disk_type}
+            - "Local_NVMe_SSD"
+
 
   storage_tier_2_disk_type:
     title: "Storage tier-2 disk type"
@@ -396,15 +550,57 @@ variables:
     maximum: 32768
     required: false
 
+  create_client_nodes:
+    type: boolean
+    title: "Create Client/Compute Nodes"
+    description: "Select checkbox, if you want to create compute nodes to mount the filesystem"
+    required: false
+    default: false
+
   client_node_shape:
     title: "Client Compute Shape"
     description: "Shape for client instances."
-    type: oci:core:instanceshape:name
     default: "VM.Standard2.24"
+    visible: ${create_client_nodes}
     required: true
-    dependsOn:
-      compartmentId: ${compartment_ocid}
-      imageId: ${mp_listing_resource_id}
+    type: enum
+    enum:
+    - "VM.DenseIO2.8"
+    - "VM.DenseIO2.16"
+    - "VM.DenseIO2.24"
+    - "VM.Standard2.1"
+    - "VM.Standard2.2"
+    - "VM.Standard2.4"
+    - "VM.Standard2.8"
+    - "VM.Standard2.16"
+    - "VM.Standard2.24"
+    - "VM.Standard.E2.1"
+    - "VM.Standard.E2.2"
+    - "VM.Standard.E2.4"
+    - "VM.Standard.E2.8"
+    - "VM.Standard.E3.Flex"
+    - "VM.GPU3.1"
+    - "VM.GPU3.2"
+    - "VM.GPU3.4"
+    - "BM.Standard2.52"
+    - "BM.Standard.E2.64"
+    - "BM.Standard.E3.128"
+    - "BM.DenseIO2.52"
+    - "BM.HPC2.36"
+    - "BM.GPU3.8"
+
+  client_node_ocpus:
+    title: Cores
+    type: integer
+    description: Number of OCPU's for flex shape
+    minimum: 1
+    maximum: 64
+    default: 2
+    visible:
+      eq:
+        - ${client_node_shape}
+        - "VM.Standard.E3.Flex"
+    required: true
 
   client_node_count:
     title: "Number of clients"
@@ -412,29 +608,36 @@ variables:
     type: integer
     default: 1
     minimum: 0
-    required: true
+    visible: ${create_client_nodes}
+    required: false
 
   client_node_hostname_prefix:
     type: string
-    required: true
+    required: false
     default: "client-"
     description: "Client hostname prefix "
+    visible: ${create_client_nodes}
+
 
   beegfs_stripe_size:
     type: string
     required: true
     default: "1m"
     description: "Default file stripe size (aka chunk_size) used by clients to striping file data and send to desired number of storage targets (OSTs). Example: 1m, 512k, 2m, etc"
+    visible: ${create_client_nodes}
+
 
   beegfs_mount_point:
     type: string
     required: true
     default: "/mnt/beegfs"
     description: "Mount point on client instances for BeeGFS filesystem. "
+    visible: ${create_client_nodes}
+
 
   beegfs_high_availability:
     type: boolean
-    required: true
+    required: false
     default: false
     description: "Select checkbox to deploy BeeGFS file system with high availability."
     visible: true
@@ -519,7 +722,7 @@ variables:
     type: boolean
     title: "Use Existing VCN"
     description: "Select checkbox, to use existing VCN, otherwise new VCN, subnets and related network resources will be created"
-    required: true
+    required: false
     default: false
 
   vpc_cidr:
@@ -612,7 +815,7 @@ variables:
     type: boolean
     title: "use custom cluster name"
     description: "Use custom name for the cluster" 
-    required: true
+    required: false
     default: false
   cluster_name: 
     title: "Name of the cluster" 

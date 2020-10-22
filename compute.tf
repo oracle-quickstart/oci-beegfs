@@ -22,9 +22,15 @@ resource "oci_core_instance" "management_server" {
   fault_domain        = "FAULT-DOMAIN-${(count.index%3)+1}"
   compartment_id      = var.compartment_ocid
   display_name        = "${var.management_server_hostname_prefix}${format("%01d", count.index+1)}"
-  hostname_label      = "${var.management_server_hostname_prefix}${format("%01d", count.index+1)}"
   shape               = var.management_server_shape
-  subnet_id           = local.storage_subnet_id
+
+  create_vnic_details {
+    subnet_id              = local.storage_subnet_id
+    hostname_label      = "${var.management_server_hostname_prefix}${format("%01d", count.index+1)}"
+    skip_source_dest_check = true
+    assign_public_ip    = false
+  }
+
 
   source_details {
     source_type       = "image"
@@ -43,7 +49,7 @@ resource "oci_core_instance" "management_server" {
         tls_private_key.ssh.public_key_openssh
       ]
     )
-    user_data = "${base64encode(join("\n", list(
+    user_data = base64encode(join("\n", list(
         "#!/usr/bin/env bash",
         "set -x",
         "server_node_count=\"${var.management_server_node_count}\"",
@@ -66,8 +72,16 @@ resource "oci_core_instance" "management_server" {
         file("${var.scripts_directory}/repo_beegfs.sh"),
         (var.management_high_availability ? file("${var.scripts_directory}/install_ha_management.sh") : ""),
         (var.management_high_availability ? "" : file("${var.scripts_directory}/install_management.sh")),
-      )))}"
+      )))
     }
+
+    dynamic "shape_config" {
+      for_each = local.is_management_server_flex_shape
+        content {
+          ocpus = shape_config.value
+        }
+    }
+
 
   timeouts {
     create = "120m"
@@ -135,9 +149,14 @@ resource "oci_core_instance" "metadata_server" {
   fault_domain        = "FAULT-DOMAIN-${(count.index%3)+1}"
   compartment_id      = var.compartment_ocid
   display_name        = "${var.metadata_server_hostname_prefix}${format("%01d", count.index+1)}"
-  hostname_label      = "${var.metadata_server_hostname_prefix}${format("%01d", count.index+1)}"
   shape               = var.metadata_server_shape
-  subnet_id           = local.storage_subnet_id
+
+  create_vnic_details {
+    subnet_id              = local.storage_subnet_id
+    hostname_label      = "${var.metadata_server_hostname_prefix}${format("%01d", count.index+1)}"
+    skip_source_dest_check = true
+    assign_public_ip    = false
+  }
 
   source_details {
     source_type = "image"
@@ -158,7 +177,7 @@ resource "oci_core_instance" "metadata_server" {
         tls_private_key.ssh.public_key_openssh
       ]
     )
-    user_data = "${base64encode(join("\n", list(
+    user_data = base64encode(join("\n", list(
         "#!/usr/bin/env bash",
         "set -x",
         "server_node_count=\"${var.metadata_server_node_count}\"",
@@ -185,7 +204,7 @@ resource "oci_core_instance" "metadata_server" {
         (var.metadata_use_shared_disk ? file("${var.scripts_directory}/install_ha_metadata.sh") : ""),
         (var.metadata_use_shared_disk ? "" : file("${var.scripts_directory}/install_metadata.sh")),
         file("${var.scripts_directory}/metadata_tuning.sh")
-      )))}"
+      )))
     }
 
   timeouts {
@@ -255,9 +274,14 @@ resource "oci_core_instance" "storage_server" {
   fault_domain        = "FAULT-DOMAIN-${(count.index%3)+1}"
   compartment_id      = var.compartment_ocid
   display_name        = "${var.storage_server_hostname_prefix}${format("%01d", count.index+1)}"
-  hostname_label      = "${var.storage_server_hostname_prefix}${format("%01d", count.index+1)}"
   shape               = var.storage_server_shape
-  subnet_id           = local.storage_subnet_id
+
+  create_vnic_details {
+    subnet_id              = local.storage_subnet_id
+    hostname_label      = "${var.storage_server_hostname_prefix}${format("%01d", count.index+1)}"
+    skip_source_dest_check = true
+    assign_public_ip    = false
+  }
 
   source_details {
     source_type = "image"
@@ -277,7 +301,7 @@ resource "oci_core_instance" "storage_server" {
         tls_private_key.ssh.public_key_openssh
       ]
     )
-    user_data = "${base64encode(join("\n", list(
+    user_data = base64encode(join("\n", list(
         "#!/usr/bin/env bash",
         "set -x",
         "server_node_count=\"${var.storage_server_node_count}\"",
@@ -315,7 +339,7 @@ resource "oci_core_instance" "storage_server" {
         (var.storage_use_shared_disk ? file("${var.scripts_directory}/install_ha_storage.sh") : ""),
         (var.storage_use_shared_disk ? "" : file("${var.scripts_directory}/install_storage.sh")),
 #       file("${var.scripts_directory}/storage_tuning.sh"),
-      )))}"
+      )))
     }
 
   timeouts {
@@ -387,9 +411,14 @@ resource "oci_core_instance" "client_node" {
   #fault_domain        = "FAULT-DOMAIN-${(count.index%3)+1}"
   compartment_id      = var.compartment_ocid
   display_name        = "${var.client_node_hostname_prefix}${format("%01d", count.index+1)}"
-  hostname_label      = "${var.client_node_hostname_prefix}${format("%01d", count.index+1)}"
   shape               = var.client_node_shape
-  subnet_id           = local.client_subnet_id
+
+  create_vnic_details {
+    subnet_id              = local.client_subnet_id
+    hostname_label      = "${var.client_node_hostname_prefix}${format("%01d", count.index+1)}"
+    skip_source_dest_check = true
+    assign_public_ip    = false
+  }
 
   source_details {
     source_type = "image"
@@ -409,7 +438,7 @@ resource "oci_core_instance" "client_node" {
         tls_private_key.ssh.public_key_openssh
       ]
     )
-    user_data = "${base64encode(join("\n", list(
+    user_data = base64encode(join("\n", list(
         "#!/usr/bin/env bash",
         "set -x",
         "stripe_size=\"${var.beegfs_stripe_size}\"",
@@ -430,7 +459,7 @@ resource "oci_core_instance" "client_node" {
         file("${var.scripts_directory}/repo_beegfs.sh"),
         file("${var.scripts_directory}/install_client.sh"),
         file("${var.scripts_directory}/update_etc_hosts.sh"),
-      )))}"
+      )))
     }
 
   timeouts {
@@ -452,11 +481,19 @@ resource "oci_core_instance" "bastion" {
   compartment_id      = var.compartment_ocid
   display_name        = "${var.bastion_hostname_prefix}${format("%01d", count.index+1)}"
   shape               = var.bastion_shape
-  hostname_label      = "${var.bastion_hostname_prefix}${format("%01d", count.index+1)}"
+
+  dynamic "shape_config" {
+    for_each = local.is_bastion_flex_shape
+      content {
+        ocpus = shape_config.value
+      }
+  }
 
   create_vnic_details {
     subnet_id              = local.bastion_subnet_id
+    hostname_label      = "${var.bastion_hostname_prefix}${format("%01d", count.index+1)}"
     skip_source_dest_check = true
+    assign_public_ip    = true
   }
 
   metadata = {

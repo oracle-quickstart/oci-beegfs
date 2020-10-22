@@ -9,15 +9,15 @@
 # 172.28.0.0/16   10.0.0.0/16
 variable vpc_cidr { default = "10.0.0.0/16" }
 
-variable beegfs_high_availability { default = true }
-variable management_high_availability { default = true }
-variable metadata_high_availability { default = true }
-variable storage_high_availability { default = true }
+variable beegfs_high_availability { default = false }
+variable management_high_availability { default = false }
+variable metadata_high_availability { default = false }
+variable storage_high_availability { default = false }
 
 # set to true if you want to use OCI Block Volume with Multi-attach feature (SAN like storage) instead of BeeGFS Buddy Mirror/replication feature for HA solution.
-variable metadata_use_shared_disk { default = true }
+variable metadata_use_shared_disk { default = false }
 # set to true if you want to use OCI Block Volume with Multi-attach feature (SAN like storage) instead of BeeGFS Buddy Mirror/replication feature for HA solution.
-variable storage_use_shared_disk { default = true }
+variable storage_use_shared_disk { default = false }
 
 
 # Has to be within the subnet "fs" CIDR range. Better to use an IP which is closer to the end of the CIDR range.
@@ -26,11 +26,12 @@ variable management_vip_private_ip { default = "10.0.2.254" }
 # we need to define a VIP for each pair of metadata servers.
 # Has to be within the subnet "fs" CIDR range. Better to use an IP which is closer to the end of the CIDR range.
 variable "metadata_vip_private_ip" {
-  #default = ["10.0.2.253","10.0.2.252"]
+  default = "10.0.2.253,10.0.2.252"
 }
 
 # we need to define a VIP for each pair of storage servers.
-variable "storage_vip_private_ip" {  #default = ["10.0.2.251","10.0.2.250"]
+variable "storage_vip_private_ip" {  
+  default = "10.0.2.251,10.0.2.250"
 }
 
 variable "ha_vip_mapping" {
@@ -56,11 +57,15 @@ variable "ha_vip_mapping" {
 }
 
 variable bastion_shape { default = "VM.Standard2.2" }
+# Number of OCPU's for flex shape
+variable bastion_ocpus { default = "1" }
 variable bastion_node_count { default = 1 }
 variable bastion_hostname_prefix { default = "bastion-" }
 
 # BeeGFS Management (MGS) Server nodes variables
 variable management_server_shape { default = "VM.Standard2.2" }
+# Number of OCPU's for flex shape
+variable management_server_ocpus { default = "1" }
 variable management_server_node_count { default = 2 }
 variable management_server_disk_count { default = 1 }
 variable management_server_disk_size { default = 50 }
@@ -71,6 +76,8 @@ variable management_server_hostname_prefix { default = "mgs-server-" }
 
 # BeeGFS Metadata (MDS) Server nodes variables  #VM.Standard2.8
 variable metadata_server_shape { default = "VM.Standard2.24" }
+# Number of OCPU's for flex shape
+variable metadata_server_ocpus { default = "1" }
 variable metadata_server_node_count { default = 2 }
 # if disk_count > 1, then it create multiple MDS instance, each with 1 disk as MDT for optimal performance. If node has both local nvme ssd and block storage, block storage volumes will be ignored.
 variable metadata_server_disk_count { default = 1 }
@@ -83,13 +90,17 @@ variable metadata_server_hostname_prefix { default = "metadata-server-" }
 
 # BeeGFS Stoarage/Object (OSS) Server nodes variables BM.Standard2.52
 variable storage_server_shape { default = "BM.Standard2.52" }
+# Number of OCPU's for flex shape
+variable storage_server_ocpus { default = "1" }
 variable storage_server_node_count { default = 2 }
 variable storage_server_hostname_prefix { default = "storage-server-" }
 
 
 # Client nodes variables VM.Standard2.24, VM.Standard2.2 , BM.HPC2.36
 variable client_node_shape { default = "BM.HPC2.36" }
-variable client_node_count { default = 3 }
+# Number of OCPU's for flex shape
+variable client_node_ocpus { default = "1" }
+variable client_node_count { default = 0 }
 variable client_node_hostname_prefix { default = "client-" }
 
 
@@ -210,10 +221,17 @@ locals {
   metadata_server_filesystem_vnic_hostname_prefix   = "${var.metadata_server_hostname_prefix}fs-vnic-"
   storage_server_filesystem_vnic_hostname_prefix    = "${var.storage_server_hostname_prefix}fs-vnic-"
 
+  is_bastion_flex_shape = var.bastion_shape == "VM.Standard.E3.Flex" ? [var.bastion_ocpus]:[]
+  is_management_server_flex_shape = var.management_server_shape == "VM.Standard.E3.Flex" ? [var.management_server_ocpus]:[]
+  is_metadata_server_flex_shape = var.metadata_server_shape == "VM.Standard.E3.Flex" ? [var.metadata_server_ocpus]:[]
+  is_storage_server_flex_shape = var.storage_server_shape == "VM.Standard.E3.Flex" ? [var.storage_server_ocpus]:[]
+  is_client_node_flex_shape = var.client_node_shape == "VM.Standard.E3.Flex" ? [var.bastion_ocpus]:[]
+
+
   # If ad_number is non-negative use it for AD lookup, else use ad_name.
   # Allows for use of ad_number in TF deploys, and ad_name in ORM.
   # Use of max() prevents out of index lookup call.
-  ad = "${var.ad_number >= 0 ? lookup(data.oci_identity_availability_domains.availability_domains.availability_domains[max(0,var.ad_number)],"name") : var.ad_name}"
+  ad = var.ad_number >= 0 ? lookup(data.oci_identity_availability_domains.availability_domains.availability_domains[max(0,var.ad_number)],"name") : var.ad_name
 }
 
 /*
@@ -331,7 +349,7 @@ resource "random_string" "hacluster_user_password" {
 }
 
 output "hacluster_user_password" {
-  value = ["${random_string.hacluster_user_password.result}"]
+  value = [random_string.hacluster_user_password.result]
 }
 
 /*
