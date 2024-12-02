@@ -1,6 +1,10 @@
 # oci-beegfs
 Terraform modules that deploy [BeeGFS](https://www.beegfs.io/content/) on [Oracle Cloud Infrastructure (OCI)](https://cloud.oracle.com/en_US/cloud-infrastructure).
 
+## BeeGFS License 
+BeeGFS requires license, reach out to [thinkparQ](https://thinkparq.com/) for license details.   This github code is open source and its users responsibility to get the required license.  
+
+
 ## High Level Architecture 
 ![](./images/Beegfs_OCI_High_Level_Arch.png)
 
