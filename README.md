@@ -30,5 +30,20 @@ Deploy using standard Terraform commands
 Pass ad_number=2, if you want to deploy to Availability-Domain-3. similarly use 0 for AD-1, 1 for AD-2. 
 
         terraform apply -var="ad_number=2"
-
+        
 ![](./images/TF-apply.PNG)
+
+## Contributing
+
+This project welcomes contributions from the community. Before submitting a pull request, please [review our contribution guide](./CONTRIBUTING.md)
+
+## Security
+
+Please consult the [security guide](./SECURITY.md) for our responsible security vulnerability disclosure process
+
+## License
+
+Copyright (c) 2019 Oracle and/or its affiliates.
+
+Released under the Universal Permissive License v1.0 as shown at
+<https://oss.oracle.com/licenses/upl/>.
